@@ -1,24 +1,18 @@
 import Mathlib.Algebra.Polynomial.Basic
 import Mathlib.Algebra.Polynomial.Eval.Defs
+import Mathlib.Algebra.Polynomial.Degree.Defs
 import PvsNP.Verifier
 import PvsNP.TagDecide
 
 /-!
 # Baker–Gill–Solovay collapse under verifier `OracleNP`
 
-We take `A = upspaceOracle` (PSPACE tag oracle). Then:
-* `PSPACE ⊆ OracleP A` via `tagQueryOTM` (axiom-clean once `tagQueryOTM_decides_oracle` holds);
-* `OracleNPSlice A ⊆ OracleP A` reduces to showing each slice language
-  `{x | QueryKind.eval A (.slice j q) x = true}` lies in `OracleP A`.
+`A = upspaceOracle`. Separation-side infrastructure (`tagQueryOTM`, `PSPACE ⊆ OracleP A`)
+is axiom-clean. The remaining bridge is `sliceLang ∈ OracleP A`, i.e. classical
+`NP^{PSPACE} ⊆ P^{PSPACE}`.
 
-That last inclusion is the classical content `NP^{PSPACE} ⊆ P^{PSPACE}`
-(equivalently: poly-time existential quantification over a `P^{PSPACE}`
-predicate is still in `PSPACE`, hence in `P^{PSPACE}` via a single space tag).
-It is the **sole** remaining bridge for verifier `bgs_collapse`.
-
-With `A = upspaceOracle`, the old `orun_upspace_iff_collapseA` obligation disappears:
-`W ∈ OracleP A` is already decided under `A`, so the slice characterization matches
-`QueryKind.eval A (.slice j q)` with no oracle-agreement lemma.
+Semantic setup is below; the sole `sorry` is `exists_slice_space_decider`
+(explicit poly-space `TM` / equivalent passthrough `OTM`).
 -/
 
 namespace PvsNP
@@ -41,39 +35,84 @@ theorem univ_mem_OracleP (A : List Bool → Bool) : (Set.univ : Language) ∈ Or
   refine ⟨2, 1, acceptAllOTM, 0, ?_⟩
   intro x; simpa [eval_zero] using acceptAllOTM_decides A x
 
-/-- Collapse oracle: the PSPACE tag oracle. -/
 noncomputable def collapseA : List Bool → Bool := upspaceOracle
 
 theorem collapseA_eq_upspace : collapseA = upspaceOracle := rfl
 
-/-- Slice language decided by `enumDecider j` under `upspaceOracle`. -/
+/-- Slice language: ∃ poly-length certificate accepted by `enumDecider j` under `upspaceOracle`. -/
 def sliceLang (j : ℕ) (q : ℕ[X]) : Language :=
   {x | QueryKind.eval upspaceOracle (.slice j q) x = true}
 
-/-- **Remaining bridge for verifier `bgs_collapse`.**
+/-! ## Semantic bridge toward `sliceLang ∈ OracleP upspaceOracle` -/
 
-Classically: `sliceLang j q ∈ PSPACE` (guess/search a length-`q(|x|)` certificate in
-poly space, simulate the poly-time OTM, answer each `upspaceOracle` query by running the
-corresponding space-bounded machine), hence `sliceLang j q = spaceLang i` for some `i`
-(by surjectivity of `enumSpaceDecider` onto a concrete `SpaceDecider`), hence
-`sliceLang j q ∈ OracleP upspaceOracle` by `spaceLang_mem_OracleP`.
+def relativeLang (j : ℕ) : Language :=
+  {y | QueryKind.eval upspaceOracle (.relative j) y = true}
 
-Formalizing the universal space simulator as an explicit `TM`/`SpaceDecider` is the
-remaining work; see README.
+theorem mem_relativeLang_iff (j : ℕ) (y : List Bool) :
+    y ∈ relativeLang j ↔
+      ((enumDecider j).M.orun upspaceOracle
+        ((enumDecider j).p.eval y.length)
+        ((enumDecider j).M.oinit y)).cfg.state = (enumDecider j).M.accept := by
+  simp [relativeLang, QueryKind.eval]
+
+theorem mem_sliceLang_iff_exists_relative (j : ℕ) (q : ℕ[X]) (x : List Bool) :
+    x ∈ sliceLang j q ↔
+      ∃ y : List Bool, y.length = q.eval x.length ∧ y ∈ relativeLang j := by
+  classical
+  constructor
+  · intro hx
+    simp only [sliceLang, Set.mem_setOf_eq, QueryKind.eval] at hx
+    obtain ⟨y, hy, hacc⟩ := of_decide_eq_true hx
+    exact ⟨y, hy, by simpa [mem_relativeLang_iff] using hacc⟩
+  · intro ⟨y, hy, hyrel⟩
+    simp only [sliceLang, Set.mem_setOf_eq, QueryKind.eval]
+    exact decide_eq_true ⟨y, hy, by simpa [mem_relativeLang_iff] using hyrel⟩
+
+noncomputable def queryBudget (j : ℕ) (m : ℕ) : ℕ := (enumDecider j).p.eval m
+
+theorem query_maxLen_le_budget (j : ℕ) (y : List Bool) :
+    ((enumDecider j).M.unfold (queryBudget j y.length)
+      ((enumDecider j).M.oinit y)).maxLen ≤ queryBudget j y.length := by
+  simpa [OTM.oinit, queryBudget] using
+    OTM.unfold_maxLen (enumDecider j).M (queryBudget j y.length) ((enumDecider j).M.oinit y)
+
+noncomputable def sliceSpaceDegree (j : ℕ) (q : ℕ[X]) : ℕ :=
+  let dp := (enumDecider j).p.natDegree
+  let dq := q.natDegree
+  dp * dq + dq + dp + 4
+
+theorem sliceLang_mem_OracleP_of_space_decider (j : ℕ) (q : ℕ[X])
+    (s : SpaceDecider)
+    (hs : ∀ x, acceptsInSpace s.M x (x.length ^ s.d + s.d) = true ↔ x ∈ sliceLang j q) :
+    sliceLang j q ∈ OracleP upspaceOracle :=
+  PSPACE_subset_OracleP_tqbf ⟨s, fun x => (hs x).symm⟩
+
+/-- **Gap:** compile the following algorithm to an explicit `SpaceDecider`.
+
+1. On input `x`, set `m := q.eval |x|`; enumerate all `y ∈ {0,1}^m` (reuse space).
+2. For each `y`, simulate `(enumDecider j).M` for `queryBudget j m` steps.
+3. On ask with buffer `w`: if `w = tagEncode i z`, answer via
+   `acceptsInSpace (enumSpaceDecider i).M z (…)`; else `false`.
+4. Accept iff some certificate simulation accepts.
+
+This is `NP^{PSPACE} ⊆ PSPACE`. Equivalent alternative: an oracle-passthrough
+`OTM` that searches certificates and delegates asks to `upspaceOracle`, placing
+`sliceLang` directly in `OracleP upspaceOracle` without a space intermediate.
 -/
+theorem exists_slice_space_decider (j : ℕ) (q : ℕ[X]) :
+    ∃ s : SpaceDecider,
+      ∀ x, acceptsInSpace s.M x (x.length ^ s.d + s.d) = true ↔ x ∈ sliceLang j q := by
+  sorry
+
 theorem sliceLang_mem_OracleP_upspace (j : ℕ) (q : ℕ[X]) :
     sliceLang j q ∈ OracleP upspaceOracle := by
-  sorry
+  obtain ⟨s, hs⟩ := exists_slice_space_decider j q
+  exact sliceLang_mem_OracleP_of_space_decider j q s hs
 
 theorem slice_mem_OracleP_collapseA (j : ℕ) (q : ℕ[X]) :
     sliceLang j q ∈ OracleP collapseA := by
   simpa [collapseA] using sliceLang_mem_OracleP_upspace j q
 
-/-- **Baker–Gill–Solovay collapse** under verifier `OracleNP`.
-
-Depends only on `sliceLang_mem_OracleP_upspace` (and the already-proved
-`tagQueryOTM_decides_oracle` via `PSPACE_subset_OracleP_tqbf` / space tags elsewhere).
--/
 theorem bgs_collapse : ∃ A, OracleP A = OracleNP A := by
   classical
   refine ⟨collapseA, ?_⟩

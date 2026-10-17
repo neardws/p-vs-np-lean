@@ -22,6 +22,8 @@ open PvsNP PvsNP.Natural
 #print axioms bgs_separation
 #print axioms OracleP_subset_OracleNP
 #print axioms P_subset_NP
+#print axioms exists_slice_space_decider
+#print axioms sliceLang_mem_OracleP_upspace
 #print axioms bgs_collapse
 #print axioms bgs_collapse_rawFragment
 #print axioms univ_mem_OracleP

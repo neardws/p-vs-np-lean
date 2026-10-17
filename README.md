@@ -56,48 +56,43 @@ PSPACE        = Fin-machines + acceptsInSpace
 | **`tagQuery_after_tag`**, **`tagWriting_orun`** | ✅ |
 | **`tagQueryOTM_decides_oracle`**, **`spaceLang_mem_OracleP`** | ✅ axiom-clean |
 | **`PSPACE_subset_OracleP_tqbf`** | ✅ axiom-clean |
-| **`bgs_collapse`** (verifier NP + `collapseA = upspaceOracle`) | 🟡 one bridge below |
+| **`bgs_collapse`** (verifier NP + `collapseA = upspaceOracle`) | 🟡 `exists_slice_space_decider` |
 | **`bgs_collapse_rawFragment`** | ✅ axiom-clean sanity check |
 | `P_ne_NP` | ⛔ intentional open problem |
 
 ### Sole remaining bridge for verifier `bgs_collapse`
 
-**`sliceLang_mem_OracleP_upspace`** — show
-`{x | QueryKind.eval upspaceOracle (.slice j q) x = true} ∈ OracleP upspaceOracle`.
+**`exists_slice_space_decider`** → **`sliceLang_mem_OracleP_upspace`** → **`bgs_collapse`**.
 
-This is the classical fact `NP^{PSPACE} ⊆ P^{PSPACE}` (equivalently: a poly-time
-existential over a `P^{PSPACE}` predicate is in `PSPACE`, hence in `P^{PSPACE}`
-via one space tag).
+Semantic lemmas in `PvsNP/Collapse.lean` (axiom-clean):
+- `mem_sliceLang_iff_exists_relative` — slice ↔ ∃ certificate in `relativeLang j`
+- `query_maxLen_le_budget` — poly-time OTM queries have length ≤ time budget
+- `sliceLang_mem_OracleP_of_space_decider` — any matching `SpaceDecider` lands in `OracleP`
 
-**Next proof plan (honest, no fuel/fixed-point shortcuts):**
+**Gap (one `sorry`):** compile the classical `NP^{PSPACE} ⊆ PSPACE` simulator to an
+explicit `SpaceDecider` (or an equivalent certificate-search `OTM` with oracle
+passthrough to `upspaceOracle`):
 
-1. **Build a `SpaceDecider` for `sliceLang j q`.**
-   - On input `x`, enumerate all certificates `y` of length `q(|x|)` (reuse space).
-   - For each `y`, simulate `(enumDecider j).M` for `p(|y|)` steps.
-   - On each oracle ask with buffer `w`: decode `tagEncode i z` (or reject the query);
-     answer by running `acceptsInSpace (enumSpaceDecider i).M z (bound)`.
-   - Accept iff some certificate run accepts.
-2. **Space bound:** poly in `|x|` for the outer search + the nested space bound
-   `|z|^d + d` with `|z| ≤ poly(|x|)`. Pick `SpaceDecider.d` large enough.
-3. **Conclude:** that `SpaceDecider` witnesses `sliceLang j q ∈ PSPACE`;
-   surjectivity of `enumSpaceDecider` gives an index `i` with
-   `sliceLang j q = spaceLang i`; apply `spaceLang_mem_OracleP`.
+1. Enumerate `y ∈ {0,1}^{q(|x|)}` reusing space.
+2. Simulate `enumDecider j` for `p(|y|)` steps; answer space-tags via nested
+   `acceptsInSpace` (or passthrough asks if building an `OTM` directly).
+3. Accept iff some certificate accepts; set `d = sliceSpaceDegree j q`.
 
-The previous bridge `orun_upspace_iff_collapseA` was removed by setting
-`collapseA = upspaceOracle`: languages in `OracleP collapseA` are already decided
-under `upspaceOracle`, so the slice characterization matches `QueryKind.eval`
-with no oracle-agreement lemma.
+Until that TM/`OTM` table exists, `#print axioms bgs_collapse` lists `sorryAx`.
+**`bgs_separation` does not. `tagQueryOTM_decides_oracle` does not.**
 
-Until `sliceLang_mem_OracleP_upspace` is closed, `#print axioms bgs_collapse`
-still lists `sorryAx`. **`bgs_separation` does not.**
-**`tagQueryOTM_decides_oracle` does not.**
+Alternative formalization path (not started): length-well-founded **hard-slice tag**
+oracle + `sliceTagOTM` (write pad + header + `x`, one ask) — avoids a universal
+space simulator but needs a variable-length padding writer `OTM` and WF oracle lemmas.
 
 ## Framework readiness
 
 **Relativization — separation: complete** under verifier `OracleNP` (axiom-clean).
 
 **Relativization — collapse: one classical PSPACE-closure bridge left**
-(`sliceLang ∈ OracleP upspaceOracle`). Tag-query infrastructure is complete.
+(`exists_slice_space_decider` / `NP^{PSPACE} ⊆ PSPACE` as an explicit `TM`).
+Semantic lemmas and `sliceLang_mem_OracleP_of_space_decider` are done; tag-query
+infrastructure is complete.
 
 **Unrelativized `P ⊆ NP`: complete** under `NP = P ∪ NPViaVerifier`.
 
@@ -108,6 +103,6 @@ still lists `sorryAx`. **`bgs_separation` does not.**
 - **`OracleNP A = OracleP A ∪ OracleNPSlice A`**：验证器形式（项目定义）。
 - **`bgs_separation`**：已无 `sorryAx`（验证器 `OracleNP`）。
 - **`tagQueryOTM_decides_oracle`**：标签写入 + 拷贝循环 + 询问，已完整证明（公理干净）。
-- **`bgs_collapse`**：`collapseA = upspaceOracle`；只剩一条桥
-  `sliceLang_mem_OracleP_upspace`（即 `NP^{PSPACE} ⊆ P^{PSPACE}` 的形式化）。
+- **`bgs_collapse`**：`collapseA = upspaceOracle`；只剩 `exists_slice_space_decider`
+  （把 `NP^{PSPACE} ⊆ PSPACE` 编成显式 `SpaceDecider` / 直通 `OTM`）。语义引理已齐。
 - **`P_ne_NP`**：故意保留的公开问题 `sorry`。
