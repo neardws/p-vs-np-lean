@@ -23,10 +23,12 @@ open PvsNP PvsNP.Natural
 #print axioms OracleNPSlice.lengthSymmetric
 #print axioms not_lengthSymmetric_singleton_false
 #print axioms queryOTM_decides
-#print axioms bgs_collapse_of_bridges
-#print axioms PSPACE_subset_OracleP_tqbf
 #print axioms bgs_collapse
+#print axioms univ_mem_OracleP
+#print axioms acceptAllOTM_decides
+#print axioms OracleNPRawSlice_trivial_subset_OracleP
 #print axioms P_ne_NP
 #print axioms tagEncode_injective
 #print axioms spaceLang_iff_oracle
+#print axioms tagWriting_orun
 #print axioms const_false_has_circuit

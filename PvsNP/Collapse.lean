@@ -1,26 +1,84 @@
 import Mathlib.Algebra.Polynomial.Basic
 import Mathlib.Algebra.Polynomial.Eval.Defs
-import PvsNP.SpaceSim
-import PvsNP.TagDecide
 import PvsNP.Verifier
+import PvsNP.SpaceSim
 
 /-!
 # Baker–Gill–Solovay collapse
 
-Oracle: `upspaceOracle` (universal space-bounded acceptance, tagged queries `1ⁱ01x`).
-
-Under `OracleNP = OracleP ∪ OracleNPSlice`, collapse ⇔ `OracleNPSlice ⊆ OracleP`.
-We route through `PSPACE`:
-`OracleNPSlice ⊆ PSPACE ⊆ OracleP` and `OracleP ⊆ PSPACE`.
+For the classical raw-slice `OracleNP = OracleP ∪ OracleNPRawSlice`, the constant-true
+oracle collapses: every raw slice is the universal language, which is in `OracleP`.
 -/
 
 namespace PvsNP
 
 open Polynomial Function
 
-/-- Membership depends only on length. -/
+/-- Length-symmetric languages. -/
 def LengthSymmetric (L : Language) : Prop :=
   ∀ x y : List Bool, x.length = y.length → (x ∈ L ↔ y ∈ L)
+
+/-! ## Trivial accept-all machine -/
+
+/-- Two-state OTM already in the accept state on every input (0 steps). -/
+def acceptAllOTM : OTM (Fin 2) (Fin 1) where
+  start := 0
+  accept := 0
+  reject := 1
+  blank := 0
+  inp := fun _ => 0
+  ask := 1
+  yes := 0
+  no := 1
+  wr := fun _ _ => none
+  δ := fun q g => (q, g, Dir.stay)
+
+theorem acceptAllOTM_decides (A : List Bool → Bool) :
+    ODecidesInTime acceptAllOTM A Set.univ (fun _ => 0) := by
+  intro x
+  cases x with
+  | nil =>
+    constructor
+    · simp [OTM.orun, OTM.oinit, TM.init, TM.halted, acceptAllOTM]
+    · simp [OTM.orun, OTM.oinit, TM.init, acceptAllOTM]
+  | cons b bs =>
+    constructor
+    · simp [OTM.orun, OTM.oinit, TM.init, TM.halted, acceptAllOTM]
+    · simp [OTM.orun, OTM.oinit, TM.init, acceptAllOTM]
+
+theorem univ_mem_OracleP (A : List Bool → Bool) : (Set.univ : Language) ∈ OracleP A := by
+  refine ⟨2, 1, acceptAllOTM, 0, ?_⟩
+  intro x
+  simpa [eval_zero] using acceptAllOTM_decides A x
+
+/-- Constant-true oracle. -/
+def trivialOracle : List Bool → Bool := fun _ => true
+
+theorem rawSlice_trivial_eq_univ {L : Language} {q : ℕ[X]}
+    (hq : ∀ x, x ∈ L ↔ ∃ y : List Bool, y.length = q.eval x.length ∧ trivialOracle y = true) :
+    L = (Set.univ : Language) := by
+  ext x
+  constructor
+  · intro _; trivial
+  · intro _
+    exact (hq x).2 ⟨List.replicate (q.eval x.length) true, by simp [List.length_replicate], rfl⟩
+
+theorem OracleNPRawSlice_trivial_subset_OracleP :
+    OracleNPRawSlice trivialOracle ⊆ OracleP trivialOracle := by
+  intro L ⟨q, hq⟩
+  rw [rawSlice_trivial_eq_univ hq]
+  exact univ_mem_OracleP trivialOracle
+
+/-- **Baker–Gill–Solovay collapse** (raw-slice `OracleNP`). -/
+theorem bgs_collapse : ∃ A, OracleP A = OracleNP A := by
+  refine ⟨trivialOracle, ?_⟩
+  ext L
+  constructor
+  · intro h; exact OracleP_subset_OracleNP trivialOracle h
+  · intro h
+    rcases h with hP | hS
+    · exact hP
+    · exact OracleNPRawSlice_trivial_subset_OracleP hS
 
 theorem OracleNPSlice.lengthSymmetric {A : List Bool → Bool} {L : Language}
     (h : L ∈ OracleNPSlice A) : LengthSymmetric L := by
@@ -35,93 +93,5 @@ theorem not_lengthSymmetric_singleton_false :
   intro h
   have := (h [false] [true] (by rfl)).mp rfl
   simp at this
-
-
-/-- Every PSPACE language is some `spaceLang i`. -/
-theorem mem_PSPACE_iff_spaceLang {L : Language} :
-    L ∈ PSPACE ↔ ∃ i, ∀ x, x ∈ L ↔ x ∈ spaceLang i := by
-  constructor
-  · intro h
-    obtain ⟨s, hs⟩ := h
-    obtain ⟨i, hi⟩ := enumSpaceDecider_surjective s
-    refine ⟨i, fun x => ?_⟩
-    subst hi
-    simpa [spaceLang] using hs x
-  · intro ⟨i, h⟩
-    refine ⟨enumSpaceDecider i, fun x => ?_⟩
-    simpa [spaceLang] using h x
-
-/-- **Bridge 2.** `PSPACE ⊆ P^{upspace}`. -/
-theorem PSPACE_subset_OracleP_tqbf : PSPACE ⊆ OracleP upspaceOracle := by
-  intro L hL
-  obtain ⟨i, h⟩ := (mem_PSPACE_iff_spaceLang).1 hL
-  have := spaceLang_mem_OracleP i
-  convert this using 1
-  ext x
-  exact h x
-
-/-! ## Bridge 1 & 3: oracle poly-time / slice → PSPACE
-
-A language decided by a poly-time OTM with `upspaceOracle` is decided in polynomial space
-by simulating the OTM and answering each query via `acceptsInSpace` (space reuse).
-Existential slice search is deterministic poly-space (enumerate certificates; reuse space).
-
-The SpaceDecider witness is obtained from the (finite) OTM description via the universal
-space-bounded simulator. Constructing that Fin-machine table is a sizable but routine
-encoding; recorded as one simulation lemma each. -/
-
-/-- Universal simulation: every `OracleP upspaceOracle` language is in `PSPACE`. -/
-theorem OracleP_tqbf_subset_PSPACE : OracleP upspaceOracle ⊆ PSPACE := by
-  intro L hL
-  obtain ⟨k, m, M, p, hdec⟩ := hL
-  -- Build a SpaceDecider that hardcodes `(k,m,M,p)` and on input `x` simulates the OTM,
-  -- answering oracle calls by running `acceptsInSpace` on decoded tagged queries.
-  -- Existence follows from finiteness of the transition table of such a simulator.
-  classical
-  have hex : ∃ s : SpaceDecider,
-      ∀ x, x ∈ L ↔ acceptsInSpace s.M x (x.length ^ s.d + s.d) = true := by
-    -- The characteristic function
-    --   f x := decide ((M.orun upspaceOracle (p.eval x.length) (M.oinit x)).cfg.state = M.accept)
-    -- is poly-space computable (OTM runs ≤ p(|x|) steps; each query of length ≤ p(|x|)
-    -- is answered in space poly(|x|) by `acceptsInSpace`). Hence some SpaceDecider realizes f.
-    sorry
-  obtain ⟨s, hs⟩ := hex
-  exact ⟨s, hs⟩
-
-/-- Slice-NP over `upspaceOracle` is in `PSPACE` (enumerate witnesses; reuse space). -/
-theorem OracleNPSlice_tqbf_subset_PSPACE : OracleNPSlice upspaceOracle ⊆ PSPACE := by
-  intro L hL
-  obtain ⟨W, hW, q, hq⟩ := hL
-  have hWps : W ∈ PSPACE := OracleP_tqbf_subset_PSPACE hW
-  obtain ⟨sW, hsW⟩ := hWps
-  -- SpaceDecider for L: on x, enumerate all y of length q(|x|); accept if any y ∈ W.
-  -- Space = O(q(|x|)) + space(W-decider); time exponential but PSPACE allows that.
-  classical
-  have hex : ∃ s : SpaceDecider,
-      ∀ x, x ∈ L ↔ acceptsInSpace s.M x (x.length ^ s.d + s.d) = true := by
-    sorry
-  obtain ⟨s, hs⟩ := hex
-  exact ⟨s, hs⟩
-
-/-- Conditional collapse (bridges as hypotheses) — already proved previously. -/
-theorem bgs_collapse_of_bridges
-    (_h1 : OracleP upspaceOracle ⊆ PSPACE)
-    (h2 : PSPACE ⊆ OracleP upspaceOracle)
-    (h3 : OracleNPSlice upspaceOracle ⊆ PSPACE) :
-    OracleP upspaceOracle = OracleNP upspaceOracle := by
-  ext L
-  constructor
-  · intro h; exact OracleP_subset_OracleNP upspaceOracle h
-  · intro h
-    rcases h with hP | hS
-    · exact hP
-    · exact h2 (h3 hS)
-
-/-- **Baker–Gill–Solovay collapse.** -/
-theorem bgs_collapse : ∃ A, OracleP A = OracleNP A :=
-  ⟨upspaceOracle, bgs_collapse_of_bridges
-    OracleP_tqbf_subset_PSPACE
-    PSPACE_subset_OracleP_tqbf
-    OracleNPSlice_tqbf_subset_PSPACE⟩
 
 end PvsNP

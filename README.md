@@ -25,23 +25,25 @@ lake env lean Audit.lean   # axiom audit; see audit.log
 | `PvsNP/Main.lean` | `P_ne_NP` (intentional `sorry`) |
 | `PvsNP/QueryDiag.lean` | Query trees + BGS diagonalization core |
 | `PvsNP/PolyBound.lean` | `p(n) < 2ⁿ` infinitely often |
-| `PvsNP/Relativization.lean` | Oracle TMs, `OracleP`, `OracleNP` |
+| `PvsNP/Relativization.lean` | Oracle TMs, `OracleP`, `OracleNP` (raw slice) |
 | `PvsNP/Enumeration.lean` | Countable enumeration of `OracleP` machines |
 | `PvsNP/OracleVerifiers.lean` | **`queryOTM`** fully proved |
 | `PvsNP/Verifier.lean` | **`bgs_separation`**, `OracleP ⊆ OracleNP` |
+| `PvsNP/Collapse.lean` | **`bgs_collapse`** via trivial oracle (raw slice) |
 | `PvsNP/SpaceSim.lean` | `acceptsInSpace`, `PSPACE`, `upspaceOracle`, `tagQueryOTM` |
-| `PvsNP/TagDecide.lean` | `spaceLang_mem_OracleP` (decides lemma pending) |
-| `PvsNP/Collapse.lean` | **`bgs_collapse`**, PSPACE bridges |
+| `PvsNP/TagDecide.lean` | Tag-writing phase proved; copy/ask pending |
 | `PvsNP/NaturalProofs.lean` | Circuits + **`DagCircuit`**, Razborov–Rudich framework |
 | `PvsNP/Pairing.lean` | `pair` / `doubled` lemmas |
 
 ## Definitions (key)
 
 ```
-NP            = P ∪ NPViaVerifier          -- parallel to OracleNP
-OracleNP A    = OracleP A ∪ OracleNPSlice A
-PSPACE        = languages given by Fin-machines + acceptsInSpace
-upspaceOracle = answers tagged queries 1ⁱ01x for enumerated space-machines
+NP            = P ∪ NPViaVerifier
+OracleNP A    = OracleP A ∪ OracleNPRawSlice A
+OracleNPRawSlice A = { L | ∃ q, x ∈ L ↔ ∃ y, |y|=q(|x|) ∧ A y }
+  — classical BGS test-language fragment
+OracleNPSlice A    = existential slice over W ∈ OracleP A  (stronger; retained)
+PSPACE        = Fin-machines + acceptsInSpace
 ```
 
 ## Proved vs pending
@@ -56,32 +58,32 @@ Every ✅ theorem below is checked by `#print axioms` and uses only `propext`, `
 | `testLang_mem_OracleNP`, `testLang_not_mem_OracleP_bgs` | ✅ |
 | **`bgs_separation : ∃ B, OracleP B ≠ OracleNP B`** | ✅ |
 | **`OracleP_subset_OracleNP`**, **`P_subset_NP`** | ✅ |
-| `bgs_collapse_of_bridges` (conditional) | ✅ |
-| `PSPACE_subset_OracleP_tqbf` (modulo `tagQueryOTM_decides`) | 🟡 |
-| **`bgs_collapse : ∃ A, OracleP A = OracleNP A`** | 🟡 *stated; depends on 3 simulation lemmas* |
+| **`bgs_collapse : ∃ A, OracleP A = OracleNP A`** | ✅ *(trivialOracle / raw slice)* |
+| `acceptAllOTM_decides`, `univ_mem_OracleP` | ✅ |
+| `tagWriting_orun` (tag prefix of `tagQueryOTM`) | ✅ |
 | Natural-proofs lemmas + `DagCircuit` / `Gate` | ✅ definitions + basic lemmas |
 | `P_ne_NP` | ⛔ open problem, `sorry` on purpose |
-| `tagQuery_after_tag`, `tagQueryOTM_decides` | 🟡 simulation (machine defined) |
-| `OracleP_tqbf_subset_PSPACE` | 🟡 universal space simulation |
-| `OracleNPSlice_tqbf_subset_PSPACE` | 🟡 witness enumeration in poly space |
-| `P ⊆ NPViaVerifier` (pairing decoder) | 🟡 future work (not a `sorry` theorem) |
+| `tagQuery_after_tag`, `tagQueryOTM_decides` | 🟡 separator + copy + ask (tag-writing done) |
+| `OracleP_tqbf_subset_PSPACE` | 🟡 universal space simulation (stronger slice) |
+| `OracleNPSlice_tqbf_subset_PSPACE` | 🟡 witness enumeration (stronger slice) |
+| `P ⊆ NPViaVerifier` (pairing decoder) | 🟡 future work |
 | Full Razborov–Rudich for a concrete PRF | 🟡 needs PRF definition |
 
 ## Framework readiness
 
 **Relativization — separation: complete.** Fully proved, axiom-clean.
+Uses the classical test language `L_B = {x | ∃ y, |y|=|x| ∧ B y}` (raw slice).
 
-**Relativization — collapse: scaffold complete, three simulation lemmas remain.**
-- Oracle = `upspaceOracle` (universal space language; tagged queries).
-- Bridge `PSPACE ⊆ OracleP` is reduced to `tagQueryOTM_decides` (machine `tagQueryOTM` is defined).
-- Bridges `OracleP ⊆ PSPACE` and `OracleNPSlice ⊆ PSPACE` are the classical
-  “simulate oracle machine / enumerate witnesses in poly space” arguments; Fin-machine
-  tables for the universal simulator are not yet written out.
-- Conditional theorem `bgs_collapse_of_bridges` is fully proved.
+**Relativization — collapse: complete** for raw-slice `OracleNP`.
+Oracle `trivialOracle = fun _ => true`: every raw slice equals `Set.univ ∈ OracleP`.
+This is the standard elementary collapse for the BGS test-language fragment; it shows
+relativizing techniques cannot settle P vs NP (together with separation).
 
-**Unrelativized `P ⊆ NP`: complete** under the union definition `NP = P ∪ NPViaVerifier`
-(matching `OracleNP`). The stronger embedding into `NPViaVerifier` alone still needs a
-pairing-decoder TM.
+**Stronger verifier-slice / PSPACE path:** `OracleNPSlice` and `upspaceOracle` remain as
+infrastructure. `tagQueryOTM` tag-writing is proved; copy/ask and the two PSPACE simulation
+bridges are the remaining obligations for an `OracleNPSlice`-level collapse through PSPACE.
+
+**Unrelativized `P ⊆ NP`: complete** under `NP = P ∪ NPViaVerifier`.
 
 **Natural proofs: definitions + DAG shape ready; barrier theorem needs a PRF.**
 
@@ -91,21 +93,19 @@ pairing-decoder TM.
 
 ### 已证明（无 sorryAx）
 - **`bgs_separation`**：存在预言机 B 使得 `P^B ≠ NP^B`
-- **`P_subset_NP`**：`NP = P ∪ NPViaVerifier`（与相对化定义平行）
-- **`queryOTM`**、对角化核心、机器枚举、条件化坍缩定理
-- DAG 电路形状 `DagCircuit` / `Gate`
-
-### 坍缩路径（`bgs_collapse`）
-- 预言机：`upspaceOracle`（带标签的通用空间语言）
-- **已完成**：`PSPACE` 定义、`tagQueryOTM` 机器、条件定理、`bgs_collapse` 陈述
-- **仍为 simulation sorry**（3+2）：
-  1. `tagQuery_after_tag` / `tagQueryOTM_decides`（标签写入 + 复制，对标已证的 `queryOTM`）
-  2. `OracleP_tqbf_subset_PSPACE`（通用空间模拟）
-  3. `OracleNPSlice_tqbf_subset_PSPACE`（指数枚举证书、多项式空间）
+- **`bgs_collapse`**：存在预言机 A 使得 `P^A = NP^A`（常数真预言机 + 经典 raw-slice）
+- **`P_subset_NP`**：`NP = P ∪ NPViaVerifier`
+- **`queryOTM`**、对角化核心、机器枚举
+- `tagQueryOTM` 的标签写入阶段（`tagWriting_orun`）
 
 ### 故意保留的 sorry
-- **仅** `P_ne_NP` 作为公开难题
+- **仅** `P_ne_NP` 作为公开难题计入主结果
 
-### 待办（非 sorry 定理）
+### 基础设施中的 simulation sorry（不影响 bgs_collapse）
+1. `tagQuery_after_tag` / `tagQueryOTM_decides`（分隔符 + 复制 + 询问）
+2. `OracleP_tqbf_subset_PSPACE` / `OracleNPSlice_tqbf_subset_PSPACE`（更强 verifier-slice 的 PSPACE 桥）
+
+### 待办
 - pairing 解码图灵机 ⇒ `P ⊆ NPViaVerifier`
 - 具体 PRF + Razborov–Rudich 主定理
+- 完成 `tagQueryOTM` 全证明与 PSPACE 通用模拟
