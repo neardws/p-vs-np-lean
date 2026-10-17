@@ -29,11 +29,10 @@ lake env lean Audit.lean   # axiom audit; see audit.log
 | `PvsNP/Enumeration.lean` | Countable enumeration of `OracleP` machines |
 | `PvsNP/OracleVerifiers.lean` | **`queryOTM`** fully proved |
 | `PvsNP/Verifier.lean` | **`bgs_separation`** under verifier `OracleNP` ✅ |
-| `PvsNP/Collapse.lean` | **`bgs_collapse`** via `upspaceOracle` (PSPACE-complete); 2 infrastructure sorries |
-| `PvsNP/SpaceSim.lean` | `acceptsInSpace`, `PSPACE`, `upspaceOracle`, `tagQueryOTM` |
-| `PvsNP/TagDecide.lean` | Tag-query / PSPACE bridges (4 infrastructure sorries) |
+| `PvsNP/SpaceSim.lean` | `PSPACE`, `upspaceOracle`, `QueryKind`, `tagQueryOTM` |
+| `PvsNP/TagDecide.lean` | Tag-writing proved; `tagQuery_after_tag` ✅; copy+ask bridge |
+| `PvsNP/Collapse.lean` | Verifier `bgs_collapse` scaffold via `collapseA` |
 | `PvsNP/NaturalProofs.lean` | Circuits + Razborov–Rudich framework |
-| `PvsNP/Pairing.lean` | `pair` / `doubled` lemmas |
 
 ## Definitions (key)
 
@@ -41,9 +40,8 @@ lake env lean Audit.lean   # axiom audit; see audit.log
 NP            = P ∪ NPViaVerifier
 OracleNP A    = OracleP A ∪ OracleNPSlice A     -- VERIFIER form (project definition)
 OracleNPSlice A = { L | ∃ W ∈ OracleP A, ∃ q, x ∈ L ↔ ∃ y, |y|=q(|x|) ∧ y ∈ W }
-OracleNPRawSlice A = raw test-language fragment (retained; used in rawFragment sanity check)
+collapseA     = QueryKind tags evaluated against upspaceOracle
 PSPACE        = Fin-machines + acceptsInSpace
-upspaceOracle = tagged poly-space acceptance (PSPACE-complete style)
 ```
 
 ## Proved vs pending
@@ -52,24 +50,40 @@ upspaceOracle = tagged poly-space acceptance (PSPACE-complete style)
 |---|---|
 | `exists_oracle_diag`, `OTM.unfold_*` | ✅ |
 | `queryLang_mem_OracleP`, `queryOTM_decides` | ✅ |
-| `testLang_mem_OracleNPSlice` / `testLang_mem_OracleNP` | ✅ |
+| `testLang_mem_OracleNP` / `testLang_not_mem_OracleP_bgs` | ✅ |
 | **`bgs_separation : ∃ B, OracleP B ≠ OracleNP B`** | ✅ (verifier NP; axiom-clean) |
 | **`OracleP_subset_OracleNP`**, **`P_subset_NP`** | ✅ |
-| **`bgs_collapse_rawFragment`** (raw slice + trivial oracle) | ✅ axiom-clean sanity check |
-| **`bgs_collapse`** (verifier NP + `upspaceOracle`) | 🟡 non-trivial oracle; depends on 2 PSPACE-simulation sorries |
-| `tagQuery_after_tag`, `tagQueryOTM_decides` | 🟡 infrastructure |
-| `OracleP_tqbf_subset_PSPACE`, `OracleNPSlice_tqbf_subset_PSPACE` | 🟡 (TagDecide copies; Collapse has its own) |
+| **`tagQuery_after_tag`**, **`tagWriting_orun`** | ✅ axiom-clean |
+| **`PSPACE_subset_OracleP_tqbf`** | 🟡 needs `tagQueryOTM_decides_oracle` |
+| **`bgs_collapse`** (verifier NP + `collapseA`) | 🟡 depends on 2 bridges below |
+| **`bgs_collapse_rawFragment`** | ✅ axiom-clean sanity check |
 | `P_ne_NP` | ⛔ intentional open problem |
+
+### Remaining bridges for verifier `bgs_collapse` (why blocked)
+
+1. **`tagQueryOTM_decides_oracle`** — copy-loop + ask after the proved tag prefix.
+   Pure TM reasoning; no theory gap. Needed so one-query machines sit in `OracleP`.
+
+2. **`orun_upspace_iff_collapseA`** — show `enumDecider j` accepts under `collapseA`
+   iff under `upspaceOracle`.  
+   **Why this is hard:** `collapseA` properly extends `upspaceOracle` with slice/relative
+   tags. A poly-time OTM in `OracleP collapseA` may query those extra tags, so the two
+   oracles can disagree on a run. Proving agreement (or compiling the machine down to
+   Fin space) is the classical `P^{PSPACE} ⊆ PSPACE` content. Fuel/limit encodings were
+   explored; Bool-monotone fuel alone does not make OTM acceptance monotone, so the
+   limit oracle does not automatically validate the fixed-point equation for relative
+   codes.
+
+Until both are closed, `#print axioms bgs_collapse` still lists `sorryAx`.
+`bgs_separation` does **not**.
 
 ## Framework readiness
 
-**Relativization — separation: complete** under verifier `OracleNP`.
-Uses `testLang ∈ OracleNPSlice` via `queryLang ∈ OracleP`.
+**Relativization — separation: complete** under verifier `OracleNP` (axiom-clean).
 
-**Relativization — collapse: structured for verifier NP** with the PSPACE-complete
-`upspaceOracle` (not the trivial raw-slice shortcut). The remaining obligations are
-explicit Fin-machine simulations for `P^{PSPACE} ⊆ PSPACE` and certificate search
-(`NPSPACE = PSPACE`). A fully axiom-clean raw-slice collapse is in `bgs_collapse_rawFragment`.
+**Relativization — collapse: structured for verifier NP** with non-trivial `collapseA`
+(QueryKind tags / PSPACE-complete style), not the trivial raw-slice shortcut.
+Raw-slice collapse remains available as `bgs_collapse_rawFragment` (axiom-clean).
 
 **Unrelativized `P ⊆ NP`: complete** under `NP = P ∪ NPViaVerifier`.
 
@@ -77,23 +91,9 @@ explicit Fin-machine simulations for `P^{PSPACE} ⊆ PSPACE` and certificate sea
 
 ## 中文说明
 
-本项目在 Lean 4 中形式化 P vs NP 以及相对化、自然证明两个障碍。
-
-### 定义
-- **`OracleNP A = OracleP A ∪ OracleNPSlice A`**：预言机多项式时间验证器形式（证书由 `W ∈ OracleP A` 检查）。
-
-### 已证明（分离侧无 sorryAx）
-- **`bgs_separation`**：存在预言机 B 使得 `P^B ≠ NP^B`（验证器 `OracleNP`）
-- **`queryOTM`**、对角化核心、机器枚举、`P_subset_NP`
-- **`bgs_collapse_rawFragment`**：raw-slice + 常数真预言机的无 sorry 坍缩（对照用）
-
-### 验证器坍缩（非平凡预言机 `upspaceOracle`）
-- **`bgs_collapse`**：目标是 `P^A = NP^A`，A = PSPACE 完备风格的 `upspaceOracle`
-- 仍缺：把 `OracleP` / `OracleNPSlice` 语言编译成 `SpaceDecider` 的有限状态模拟器（经典 `P^{PSPACE}⊆PSPACE` / `NPSPACE=PSPACE`）
-
-### 故意保留的 sorry
-- **`P_ne_NP`**：公开难题
-
-### 基础设施 sorry（验证器坍缩路径）
-1. `exists_PSPACE_decider_of_OracleP` / `exists_PSPACE_decider_of_slice`（Collapse）
-2. `tagQuery_after_tag` / `tagQueryOTM_decides` / TagDecide 中两条 PSPACE 桥
+- **`OracleNP A = OracleP A ∪ OracleNPSlice A`**：验证器形式（项目定义）。
+- **`bgs_separation`**：已无 `sorryAx`（验证器 `OracleNP`）。
+- **`tagQuery_after_tag`**：标签写入已完整证明。
+- **`bgs_collapse`**：验证器坍缩骨架已接上 `collapseA`；仍差两条桥
+  （`tagQuery` 拷贝/询问、以及 `collapseA` vs `upspaceOracle` 的 `orun` 一致性）。
+- **`P_ne_NP`**：故意保留的公开问题 `sorry`。

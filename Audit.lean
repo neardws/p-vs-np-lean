@@ -1,3 +1,17 @@
+import PvsNP.TuringMachine
+import PvsNP.Complexity
+import PvsNP.Main
+import PvsNP.QueryDiag
+import PvsNP.PolyBound
+import PvsNP.Relativization
+import PvsNP.Enumeration
+import PvsNP.Pairing
+import PvsNP.OracleVerifiers
+import PvsNP.Verifier
+import PvsNP.SpaceSim
+import PvsNP.TagDecide
+import PvsNP.Collapse
+import PvsNP.NaturalProofs
 import PvsNP
 open PvsNP PvsNP.Natural
 #print axioms exists_oracle_diag
@@ -17,4 +31,5 @@ open PvsNP PvsNP.Natural
 #print axioms tagEncode_injective
 #print axioms spaceLang_iff_oracle
 #print axioms tagWriting_orun
+#print axioms tagQuery_after_tag
 #print axioms const_false_has_circuit

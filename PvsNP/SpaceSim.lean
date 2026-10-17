@@ -11,9 +11,10 @@ import Mathlib.Basic.Countable.Basic
 import PvsNP.TuringMachine
 import PvsNP.Complexity
 import PvsNP.OracleVerifiers
+import PvsNP.Enumeration
 
 /-!
-# Space-bounded simulation, PSPACE, and the BGS collapse oracle
+# Space-bounded simulation, PSPACE, and query kinds for BGS collapse
 -/
 
 namespace PvsNP
@@ -126,7 +127,6 @@ theorem tagEncode_injective {i i' : ℕ} {x x' : List Bool}
       obtain ⟨hij, hx⟩ := ih htail
       exact ⟨by omega, hx⟩
 
-/-- **PSPACE** via Fin-machines + `acceptsInSpace`. -/
 def PSPACE : Set Language :=
   {L | ∃ s : SpaceDecider,
     ∀ x, x ∈ L ↔ acceptsInSpace s.M x (x.length ^ s.d + s.d) = true}
@@ -135,6 +135,50 @@ def spaceLang (i : ℕ) : Language :=
   {x | acceptsInSpace (enumSpaceDecider i).M x
     (x.length ^ (enumSpaceDecider i).d + (enumSpaceDecider i).d) = true}
 
+/-! ## Query kinds -/
+
+inductive QueryKind where
+  | fin : ℕ → QueryKind
+  | relative : ℕ → QueryKind
+  | slice : ℕ → ℕ[X] → QueryKind
+
+instance : Countable QueryKind := by
+  let φ : QueryKind ≃ ℕ ⊕ ℕ ⊕ (ℕ × ℕ[X]) :=
+  { toFun := fun
+      | .fin i => Sum.inl i
+      | .relative j => Sum.inr (Sum.inl j)
+      | .slice j q => Sum.inr (Sum.inr (j, q))
+    invFun := fun
+      | Sum.inl i => .fin i
+      | Sum.inr (Sum.inl j) => .relative j
+      | Sum.inr (Sum.inr (j, q)) => .slice j q
+    left_inv := fun c => by cases c <;> rfl
+    right_inv := fun s => by rcases s with _ | _ | ⟨_, _⟩ <;> rfl }
+  exact Countable.of_equiv _ φ.symm
+
+instance : Nonempty QueryKind := ⟨.fin 0⟩
+
+noncomputable def enumQueryKind : ℕ → QueryKind :=
+  Classical.choose (exists_surjective_nat QueryKind)
+
+theorem enumQueryKind_surjective : Surjective enumQueryKind :=
+  Classical.choose_spec (exists_surjective_nat QueryKind)
+
+/-- Evaluate a query kind against oracle `O`. -/
+noncomputable def QueryKind.eval (O : List Bool → Bool) : QueryKind → List Bool → Bool
+  | .fin k, x =>
+      decide (acceptsInSpace (enumSpaceDecider k).M x
+        (x.length ^ (enumSpaceDecider k).d + (enumSpaceDecider k).d) = true)
+  | .relative j, x =>
+      let d := enumDecider j
+      decide ((d.M.orun O (d.p.eval x.length) (d.M.oinit x)).cfg.state = d.M.accept)
+  | .slice j q, x =>
+      let d := enumDecider j
+      @decide (∃ y : List Bool, y.length = q.eval x.length ∧
+        (d.M.orun O (d.p.eval y.length) (d.M.oinit y)).cfg.state = d.M.accept)
+        (Classical.propDecidable _)
+
+/-- Space-only oracle (`enumSpaceDecider` tags). -/
 noncomputable def upspaceOracle : List Bool → Bool := fun w =>
   @decide (∃ i : ℕ, ∃ x : List Bool, w = tagEncode i x ∧
       acceptsInSpace (enumSpaceDecider i).M x
@@ -162,8 +206,7 @@ theorem spaceLang_iff_oracle (i : ℕ) (x : List Bool) :
     x ∈ spaceLang i ↔ upspaceOracle (tagEncode i x) = true := by
   simp [spaceLang, upspaceOracle_tag_iff]
 
-/-- Tag-then-copy OTM. States `0..i-1` write `true`; state `i` writes `false`;
-state `i+1` writes `true` then copies the input (like `queryOTM`); then asks. -/
+/-- Tag-then-copy OTM. -/
 def tagQueryOTM (i : ℕ) : OTM (Fin (i + 6)) Γ₃ where
   start := ⟨0, by omega⟩
   accept := ⟨i + 4, by omega⟩

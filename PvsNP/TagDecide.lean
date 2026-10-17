@@ -85,8 +85,78 @@ theorem tagWriting_orun (i : ℕ) (A : List Bool → Bool) (x : List Bool) (t : 
     rw [hadd]; simp only [OTM.orun]
     exact tagWriting_step i t (by omega) x A _ hc
 
-/-- After `i+2` steps: buffer = tag, tape = input.
-**Remaining:** two separator writes from `tagWriting_orun i i` (same as `tagWriting_step`). -/
+/-- Separator step at state `i`: write `false`, go to `i+1`. -/
+theorem tagWriting_false_sep (i : ℕ) (A : List Bool → Bool) (x : List Bool)
+    (c : OCfg (Fin (i + 6)) Γ₃) (hc : TagWriting i i x c) :
+    let c' := (tagQueryOTM i).ostep A c
+    c'.cfg.state.val = i + 1 ∧
+    c'.buf = List.replicate i true ++ [false] ∧
+    InputAtStart i x c'.cfg := by
+  obtain ⟨hst, hbuf, hinput⟩ := hc
+  have hstFin : c.cfg.state = ⟨i, by omega⟩ := Fin.ext hst
+  have hnh : ¬ (tagQueryOTM i).toTM.halted c.cfg := not_halted_of_val_lt (by omega)
+  have hne : c.cfg.state ≠ (tagQueryOTM i).ask := by
+    intro h
+    have hv := congrArg Fin.val h
+    have : c.cfg.state.val = i := hst
+    have : (tagQueryOTM i).ask.val = i + 3 := rfl
+    omega
+  have hostep : (tagQueryOTM i).ostep A c = (tagQueryOTM i).plain c := by
+    simp only [OTM.ostep, hnh, ↓reduceIte, hne, ↓reduceIte]
+  refine ⟨?_, ?_, ?_⟩
+  · rw [hostep]
+    have hδ : (tagQueryOTM i).δ ⟨i, by omega⟩ c.cfg.head =
+        (⟨i + 1, by omega⟩, c.cfg.head, Dir.stay) := by simp [tagQueryOTM]
+    simp only [OTM.plain, TM.step, hnh, ↓reduceIte, hstFin, hδ, TM.move]
+  · rw [hostep]
+    have hwr : (tagQueryOTM i).wr ⟨i, by omega⟩ c.cfg.head = some false := by simp [tagQueryOTM]
+    have hδ : (tagQueryOTM i).δ ⟨i, by omega⟩ c.cfg.head =
+        (⟨i + 1, by omega⟩, c.cfg.head, Dir.stay) := by simp [tagQueryOTM]
+    simp only [OTM.plain, TM.step, hnh, ↓reduceIte, hstFin, hδ, TM.move, hwr,
+      Option.toList_some, hbuf]
+  · rw [hostep]
+    have hδ : (tagQueryOTM i).δ ⟨i, by omega⟩ c.cfg.head =
+        (⟨i + 1, by omega⟩, c.cfg.head, Dir.stay) := by simp [tagQueryOTM]
+    simp only [OTM.plain, TM.step, hnh, ↓reduceIte, hstFin, hδ, TM.move]
+    exact hinput
+
+/-- Separator step at state `i+1`: write `true`, go to `i+2`. -/
+theorem tagWriting_true_sep (i : ℕ) (A : List Bool → Bool) (x : List Bool)
+    (c : OCfg (Fin (i + 6)) Γ₃)
+    (hst : c.cfg.state.val = i + 1)
+    (hbuf : c.buf = List.replicate i true ++ [false])
+    (hinput : InputAtStart i x c.cfg) :
+    let c' := (tagQueryOTM i).ostep A c
+    c'.cfg.state.val = i + 2 ∧
+    c'.buf = List.replicate i true ++ [false, true] ∧
+    InputAtStart i x c'.cfg := by
+  have hstFin : c.cfg.state = ⟨i + 1, by omega⟩ := Fin.ext hst
+  have hnh : ¬ (tagQueryOTM i).toTM.halted c.cfg := not_halted_of_val_lt (by omega)
+  have hne : c.cfg.state ≠ (tagQueryOTM i).ask := by
+    intro h
+    have : c.cfg.state.val = i + 1 := hst
+    have : (tagQueryOTM i).ask.val = i + 3 := rfl
+    omega
+  have hostep : (tagQueryOTM i).ostep A c = (tagQueryOTM i).plain c := by
+    simp only [OTM.ostep, hnh, ↓reduceIte, hne, ↓reduceIte]
+  refine ⟨?_, ?_, ?_⟩
+  · rw [hostep]
+    have hδ : (tagQueryOTM i).δ ⟨i + 1, by omega⟩ c.cfg.head =
+        (⟨i + 2, by omega⟩, c.cfg.head, Dir.stay) := by simp [tagQueryOTM]
+    simp only [OTM.plain, TM.step, hnh, ↓reduceIte, hstFin, hδ, TM.move]
+  · rw [hostep]
+    have hwr : (tagQueryOTM i).wr ⟨i + 1, by omega⟩ c.cfg.head = some true := by simp [tagQueryOTM]
+    have hδ : (tagQueryOTM i).δ ⟨i + 1, by omega⟩ c.cfg.head =
+        (⟨i + 2, by omega⟩, c.cfg.head, Dir.stay) := by simp [tagQueryOTM]
+    simp only [OTM.plain, TM.step, hnh, ↓reduceIte, hstFin, hδ, TM.move, hwr,
+      Option.toList_some, hbuf]
+    simp [List.append_assoc]
+  · rw [hostep]
+    have hδ : (tagQueryOTM i).δ ⟨i + 1, by omega⟩ c.cfg.head =
+        (⟨i + 2, by omega⟩, c.cfg.head, Dir.stay) := by simp [tagQueryOTM]
+    simp only [OTM.plain, TM.step, hnh, ↓reduceIte, hstFin, hδ, TM.move]
+    exact hinput
+
 theorem tagQuery_after_tag (i : ℕ) (A : List Bool → Bool) (x : List Bool) :
     let c := (tagQueryOTM i).orun A (i + 2) ((tagQueryOTM i).oinit x)
     c.cfg.state.val = i + 2 ∧
@@ -94,14 +164,38 @@ theorem tagQuery_after_tag (i : ℕ) (A : List Bool → Bool) (x : List Bool) :
     c.cfg.left = [] ∧
     ((x = [] ∧ c.cfg.head = 0 ∧ c.cfg.right = []) ∨
       (∃ r rs, x = r :: rs ∧ c.cfg.head = encBit r ∧ c.cfg.right = rs.map encBit)) := by
+  have hc0 := tagWriting_orun i A x i le_rfl
+  have hadd1 := OTM.orun_add (tagQueryOTM i) A i 1 ((tagQueryOTM i).oinit x)
+  have h1 := tagWriting_false_sep i A x _ hc0
+  have hc1 : (tagQueryOTM i).orun A (i + 1) ((tagQueryOTM i).oinit x) =
+      (tagQueryOTM i).ostep A ((tagQueryOTM i).orun A i ((tagQueryOTM i).oinit x)) := by
+    rw [hadd1]; simp [OTM.orun]
+  have hadd2 := OTM.orun_add (tagQueryOTM i) A (i + 1) 1 ((tagQueryOTM i).oinit x)
+  have h2 := tagWriting_true_sep i A x
+    ((tagQueryOTM i).orun A (i + 1) ((tagQueryOTM i).oinit x))
+    (by rw [hc1]; exact h1.1)
+    (by rw [hc1]; exact h1.2.1)
+    (by rw [hc1]; exact h1.2.2)
+  have hc2 : (tagQueryOTM i).orun A (i + 2) ((tagQueryOTM i).oinit x) =
+      (tagQueryOTM i).ostep A ((tagQueryOTM i).orun A (i + 1) ((tagQueryOTM i).oinit x)) := by
+    rw [show i + 2 = i + 1 + 1 from rfl, hadd2]; simp [OTM.orun]
+  rw [hc2]
+  exact ⟨h2.1, h2.2.1, h2.2.2.1, h2.2.2.2⟩
+
+/-- `tagQueryOTM i` decides `{x | A (tagEncode i x) = true}` for any oracle `A`.
+Prefix `tagQuery_after_tag` is proved; copy-loop + ask follows `queryOTM_decides`
+and remains the second infrastructure bridge for `PSPACE ⊆ OracleP`. -/
+theorem tagQueryOTM_decides_oracle (i : ℕ) (A : List Bool → Bool) :
+    ODecidesInTime (tagQueryOTM i) A
+      {x | A (tagEncode i x) = true} (fun n => i + n + 4) := by
   sorry
 
-/-- `tagQueryOTM i` decides `spaceLang i` in time `i + n + 4`.
-**Remaining:** `tagQuery_after_tag` + copy loop (`queryCfg_orun` style) + ask. -/
 theorem tagQueryOTM_decides (i : ℕ) :
     ODecidesInTime (tagQueryOTM i) upspaceOracle (spaceLang i)
       (fun n => i + n + 4) := by
-  sorry
+  intro x
+  have h := tagQueryOTM_decides_oracle i upspaceOracle x
+  simpa [spaceLang_iff_oracle, Set.mem_setOf_eq] using h
 
 theorem spaceLang_mem_OracleP (i : ℕ) : spaceLang i ∈ OracleP upspaceOracle := by
   refine ⟨i + 6, 3, tagQueryOTM i, X + C (i + 4), ?_⟩
@@ -118,29 +212,5 @@ theorem PSPACE_subset_OracleP_tqbf : PSPACE ⊆ OracleP upspaceOracle := by
   ext x
   subst hi
   simpa [spaceLang] using hs x
-
-/-- **Simulation obligation:** universal space simulation of OTMs with `upspaceOracle`. -/
-theorem OracleP_tqbf_subset_PSPACE : OracleP upspaceOracle ⊆ PSPACE := by
-  intro L hL
-  obtain ⟨k, m, M, p, hdec⟩ := hL
-  classical
-  have hex : ∃ s : SpaceDecider,
-      ∀ x, x ∈ L ↔ acceptsInSpace s.M x (x.length ^ s.d + s.d) = true := by
-    sorry
-  obtain ⟨s, hs⟩ := hex
-  exact ⟨s, hs⟩
-
-/-- **Simulation obligation:** enumerate witnesses in poly space. -/
-theorem OracleNPSlice_tqbf_subset_PSPACE : OracleNPSlice upspaceOracle ⊆ PSPACE := by
-  intro L hL
-  obtain ⟨W, hW, q, hq⟩ := hL
-  have hWps : W ∈ PSPACE := OracleP_tqbf_subset_PSPACE hW
-  obtain ⟨sW, hsW⟩ := hWps
-  classical
-  have hex : ∃ s : SpaceDecider,
-      ∀ x, x ∈ L ↔ acceptsInSpace s.M x (x.length ^ s.d + s.d) = true := by
-    sorry
-  obtain ⟨s, hs⟩ := hex
-  exact ⟨s, hs⟩
 
 end PvsNP

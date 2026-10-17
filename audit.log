@@ -17,4 +17,5 @@ warning: mathlib: repository has local changes:
 'PvsNP.tagEncode_injective' depends on axioms: [propext, Quot.sound]
 'PvsNP.spaceLang_iff_oracle' depends on axioms: [propext, Classical.choice, Quot.sound]
 'PvsNP.tagWriting_orun' depends on axioms: [propext, Quot.sound]
+'PvsNP.tagQuery_after_tag' depends on axioms: [propext, Classical.choice, Quot.sound]
 'PvsNP.Natural.const_false_has_circuit' depends on axioms: [propext]
