@@ -89,4 +89,9 @@ theorem not_satisfiable_of_nil_mem {φ : CNF} (h : [] ∈ φ) : ¬ φ.Satisfiabl
 /-- coNP is exactly the set of complements of NP languages (definitional unfolding). -/
 theorem mem_coNP_iff (L : Language) : L ∈ coNP ↔ Lᶜ ∈ NP := Iff.rfl
 
+/-- **P ⊆ NP.** Pending: needs a TM that decodes `pair x y` and simulates the P-machine on `x`,
+ignoring the certificate (or using an empty certificate with `q = 0`). -/
+theorem P_subset_NP : P ⊆ NP := by
+  sorry
+
 end PvsNP

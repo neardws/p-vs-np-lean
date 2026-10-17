@@ -25,7 +25,9 @@ namespace PvsNP.Natural
 /-- Boolean functions on `n` bits. -/
 abbrev BoolFn (n : ℕ) := (Fin n → Bool) → Bool
 
-/-- De Morgan circuits (formulas with sharing omitted; size counts gates). -/
+/-- De Morgan circuits as **formulas** (trees; gate sharing omitted).
+A DAG/`P/poly` upgrade is needed before a full Razborov–Rudich theorem; size here overcounts
+shared subcircuits. -/
 inductive Circuit (n : ℕ)
   | var (i : Fin n)
   | const (b : Bool)

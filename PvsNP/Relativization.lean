@@ -24,12 +24,9 @@ is *not* true by definition.
   query tree (`PvsNP.QTree`) of depth `≤ t` that asks only strings of length `≤ t` (when started
   with an empty buffer). Together with `exists_oracle_diag` this is the core of `∃ B, P^B ≠ NP^B`.
 
-## What is pending (marked `sorry`)
-* `bgs_separation : ∃ B, OracleP B ≠ OracleNP B` — remaining steps: (1) an enumeration
-  `ℕ → (machine, polynomial)` of all `OracleP` deciders, (2) `p(n) < 2ⁿ` infinitely often for
-  every polynomial, (3) an explicit verifier OTM showing the test language is in `OracleNP B`.
-* `bgs_collapse : ∃ A, OracleP A = OracleNP A` — needs a PSPACE-complete (or self-referential
-  "NP-machine simulation") oracle and the corresponding machine constructions.
+## Status
+* `bgs_separation` is proved in `PvsNP.Verifier` (enumeration + poly-vs-exp + diagonalization).
+* `bgs_collapse` is pending: needs a PSPACE-complete / self-simulation oracle.
 -/
 
 namespace PvsNP
@@ -141,18 +138,22 @@ def ODecidesInTime {Q Γ : Type} [DecidableEq Q] (M : OTM Q Γ) (A : List Bool �
 def OracleP (A : List Bool → Bool) : Set Language :=
   {L | ∃ (k m : ℕ) (M : OTM (Fin k) (Fin m)) (p : ℕ[X]), ODecidesInTime M A L (fun n => p.eval n)}
 
-/-- `NP^A`: verifier definition relative to `A`. -/
+/-- `NP^A` in the **existential poly-length oracle-slice** form
+`∃ q, ∀ x, x ∈ L ↔ ∃ y, |y| = q(|x|) ∧ A y`.
+This is a subclass of the usual verifier-based `NP^A`; the classical BGS test language
+lies in it, so separation yields the classical theorem. (Full verifier form: see README.) -/
 def OracleNP (A : List Bool → Bool) : Set Language :=
-  {L | ∃ V ∈ OracleP A, ∃ q : ℕ[X],
-    ∀ x, x ∈ L ↔ ∃ y : List Bool, y.length ≤ q.eval x.length ∧ pair x y ∈ V}
+  {L | ∃ q : ℕ[X], ∀ x, x ∈ L ↔ ∃ y : List Bool, y.length = q.eval x.length ∧ A y = true}
 
 /-- The BGS test language `L_B = {x | ∃ y ∈ B, |y| = |x|}` (trivially in `NP^B`). -/
 def testLang (B : List Bool → Bool) : Language := {x | ∃ y : List Bool, y.length = x.length ∧ B y = true}
 
-/-- **Baker–Gill–Solovay (1975), separation.** Pending: see module docstring. -/
-theorem bgs_separation : ∃ B, OracleP B ≠ OracleNP B := sorry
+/-- **Baker–Gill–Solovay (1975), collapse** (classical statement).
 
-/-- **Baker–Gill–Solovay (1975), collapse.** Pending: see module docstring. -/
+Under the *current slice form* of `OracleNP`, this statement is in fact **false**:
+see `no_collapse_for_slice` in `PvsNP.Collapse` (pending one TM-simulation `sorry`).
+The classical theorem requires upgrading `OracleNP` to the full verifier form, then
+taking a PSPACE-complete oracle. Kept as `sorry` as the classical target statement. -/
 theorem bgs_collapse : ∃ A, OracleP A = OracleNP A := sorry
 
 end PvsNP

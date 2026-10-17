@@ -2,5 +2,9 @@ import PvsNP.TuringMachine
 import PvsNP.Complexity
 import PvsNP.Main
 import PvsNP.QueryDiag
+import PvsNP.PolyBound
 import PvsNP.Relativization
+import PvsNP.Enumeration
+import PvsNP.Verifier
+import PvsNP.Collapse
 import PvsNP.NaturalProofs

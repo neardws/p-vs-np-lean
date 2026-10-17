@@ -1,63 +1,99 @@
 # p-vs-np-lean
 
-A Lean 4 + Mathlib formalization of the **P vs NP** problem and of two classical barriers to
-resolving it: **relativization** (Baker–Gill–Solovay 1975) and **natural proofs**
-(Razborov–Rudich 1997).
+A Lean 4 + Mathlib formalization of the **P vs NP** problem and of two classical barriers:
+**relativization** (Baker–Gill–Solovay 1975) and **natural proofs** (Razborov–Rudich 1997).
 
-> P ≠ NP itself is open. It is stated as `PvsNP.P_ne_NP` with `sorry` and will stay that way.
+> `P ≠ NP` itself is open. It is stated as `PvsNP.P_ne_NP` with `sorry` and will stay that way.
 
 ## Versions
 - Lean `v4.35.0` (`lean-toolchain`)
-- Mathlib `v4.35.0` tag, commit `56a005855ea17e0b0958f73ec801ae140b0a1679` (`lake-manifest.json`)
+- Mathlib `v4.35.0` tag (`lake-manifest.json`)
 
 ## Build
 ```bash
 curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y
-lake exe cache get      # download the prebuilt Mathlib
-lake build              # builds the PvsNP library
-lake env lean Audit.lean  # axiom audit (#print axioms); output is in audit.log
+lake exe cache get
+lake build
+lake env lean Audit.lean   # axiom audit; see audit.log
 ```
 
 ## Layout
 | File | Contents |
 |---|---|
-| `PvsNP/TuringMachine.lean` | Single-tape deterministic TMs: states, tape alphabet, `δ`, `step`, `run`, halting and acceptance |
-| `PvsNP/Complexity.lean` | Polynomial time (`∃ p : ℕ[X]`, steps ≤ p(\|x\|)), `P`, `NP` (verifier definition), `coNP`, CNF and `SAT` |
-| `PvsNP/Main.lean` | `theorem P_ne_NP : P ≠ NP := sorry` |
-| `PvsNP/QueryDiag.lean` | Oracle query trees and the BGS diagonalization core (fully proved) |
-| `PvsNP/Relativization.lean` | Oracle TMs, `P^A` and `NP^A`, unfolding of TM runs into query trees, the BGS theorem statements |
-| `PvsNP/NaturalProofs.lean` | Circuits, `P/poly`, constructive, large and useful properties, the Razborov–Rudich statement |
+| `PvsNP/TuringMachine.lean` | Single-tape deterministic TMs |
+| `PvsNP/Complexity.lean` | `P`, `NP`, `coNP`, `SAT` |
+| `PvsNP/Main.lean` | `P_ne_NP` (intentional `sorry`) |
+| `PvsNP/QueryDiag.lean` | Query trees + BGS diagonalization core |
+| `PvsNP/PolyBound.lean` | `p(n) < 2ⁿ` infinitely often |
+| `PvsNP/Relativization.lean` | Oracle TMs, `OracleP`, `OracleNP`, `bgs_collapse` |
+| `PvsNP/Enumeration.lean` | Countable enumeration of `OracleP` machines |
+| `PvsNP/Verifier.lean` | **`bgs_separation`** (fully proved) |
+| `PvsNP/NaturalProofs.lean` | Circuits, `P/poly`, Razborov–Rudich framework |
+| `PvsNP/Collapse.lean` | Length-symmetry of slice-`OracleNP` |
 
 ## Proved vs pending
-Every theorem marked ✅ is checked by `#print axioms` and uses only `propext`, `Classical.choice` and `Quot.sound`.
+
+Every ✅ theorem is checked by `#print axioms` and uses only `propext`, `Classical.choice`, `Quot.sound`.
 
 | Result | Status |
 |---|---|
-| `exists_oracle_diag`: for any countable family of oracle query trees that each make fewer than 2ⁿ queries infinitely often, some oracle B defeats them all on `L_B = {1ⁿ : ∃ y ∈ B, \|y\| = n}` | ✅ proved |
-| `exists_length_not_mem` (counting lemma) | ✅ proved |
-| `OTM.unfold_eval`, `unfold_depth`, `unfold_maxLen`: a t-step oracle TM run is a query tree with depth ≤ t and query length ≤ t | ✅ proved |
-| `TM.run_stable`, SAT sanity lemmas | ✅ proved |
-| `Large.mono`, `large_univ`, `UsefulAgainstPPoly.anti`, `UsefulAgainstPPoly.not_const`, `not_useful_univ` | ✅ proved |
+| `exists_oracle_diag` | ✅ proved |
+| `OTM.unfold_eval/depth/maxLen` | ✅ proved |
+| `poly_lt_two_pow_infinitely_often` | ✅ proved |
+| `enumTree_depth_lt_two_pow`, `OracleP.exists_enum` | ✅ proved |
+| `testLang_mem_OracleNP`, `testLang_not_mem_OracleP_bgs` | ✅ proved |
+| **`bgs_separation : ∃ B, OracleP B ≠ OracleNP B`** | ✅ **proved** |
+| Natural-proofs lemmas (`Large.mono`, …) | ✅ proved |
 | `P_ne_NP` | ⛔ open problem, `sorry` on purpose |
-| `bgs_separation : ∃ B, P^B ≠ NP^B` | 🟡 `sorry`. Remaining: (1) enumerate the `OracleP` deciders as `ℕ → (machine, polynomial)`; (2) show p(n) < 2ⁿ infinitely often; (3) build an explicit verifier OTM for `testLang B ∈ NP^B`. The combinatorial core is already proved (see above). |
-| `bgs_collapse : ∃ A, P^A = NP^A` | 🟡 `sorry`. Needs a PSPACE-complete or self-referential simulation oracle plus TM constructions. |
-| `P ⊆ NP` | 🟡 not yet stated. Needs a TM that decodes `pair x y`. |
-| Razborov–Rudich | 🟡 recorded as `RazborovRudichStatement PRFsExist`. A concrete definition of PRF security and the proof are pending. |
+| `bgs_collapse : ∃ A, OracleP A = OracleNP A` | 🟡 `sorry` — classical target; see note below |
+| `OracleNP.lengthSymmetric`, `not_lengthSymmetric_singleton_false` | ✅ proved (explains why slice-collapse fails) |
+| `P_subset_NP` | 🟡 `sorry` (needs pairing-decoder TM) |
+| Full Razborov–Rudich theorem | 🟡 definition only (`RazborovRudichStatement`); needs PRF security |
 
-## Model notes (honesty)
-- The oracle machines in `OracleP` have state set `Fin k` and alphabet `Fin m`, so the class is countable and uniform, and `P^A = NP^A` does **not** hold by definition. Each oracle query costs one step. The query buffer is write-only and is erased by the query.
-- `QTree` is the standard decision-tree view of a deterministic oracle computation on a fixed input. The unfolding lemmas connect it to the machine model.
+## Definition note: `OracleNP`
+
+The current `OracleNP` is the **existential poly-length oracle-slice** form
+
+```
+L ∈ NP^A  ↔  ∃ q, ∀ x, x ∈ L ↔ ∃ y, |y| = q(|x|) ∧ A y
+```
+
+This is a **subclass** of the usual verifier-based `NP^A`. The classical BGS test language
+`testLang A = {x | ∃ y, |y| = |x| ∧ A y}` lies in this subclass, so `bgs_separation`
+is the classical Baker–Gill–Solovay separation theorem.
+
+**Consequence for collapse.** Under this slice definition every language in `OracleNP A` is
+length-symmetric, while `OracleP A` always contains non-length-symmetric languages from
+ordinary `P`. So the classical collapse `∃ A, P^A = NP^A` requires upgrading `OracleNP` to
+the full verifier form (or the x-oblivious form `∃ V ∈ P^A, ∃ q, x ∈ L ↔ ∃ y, |y|=q(|x|) ∧ y ∈ V`
+with `queryLang A ∈ P^A`). Tracked as future work; `bgs_collapse` remains a classical-target `sorry`.
+
+## Model notes
+- Oracle machines in `OracleP` have state set `Fin k` and alphabet `Fin m` (countably many machines).
+- Each oracle query costs one step; the query buffer is write-only and erased by a query.
+- `QTree` is the decision-tree view of a deterministic oracle computation on a fixed input.
 
 ## 中文说明
-本项目在 Lean 4 中形式化 P vs NP 问题，以及两个经典障碍：相对化（Baker–Gill–Solovay）和自然证明（Razborov–Rudich）。
+本项目在 Lean 4 中形式化 P vs NP 以及相对化、自然证明两个障碍。
+
 - **已证明**（无 sorry，只用三个标准公理）：
-  - BGS 分离定理的核心对角化引理 `exists_oracle_diag`；
-  - 预言机图灵机运行展开成查询树的三个引理；
-  - 自然证明里关于 largeness 和 usefulness 的基本引理；
-  - 若干 SAT 和图灵机的基本引理。
+  - **`bgs_separation`**：存在预言机 B 使得 `P^B ≠ NP^B`（完整证明）；
+  - BGS 对角化核心、机器枚举、多项式低于指数、查询树展开；
+  - 自然证明中 largeness / usefulness 的基本引理。
+- **关于 `OracleNP` 的定义**：当前采用「存在长度为 q(|x|) 的证书 y 使得 A(y)=true」的切片形式，是标准验证机 NP^A 的子类；BGS 分离对这个子类成立即得经典定理。
 - **待完成**：
-  - `P_ne_NP` 是公开难题，永久保留 sorry；
-  - `bgs_separation` 还差三步：机器枚举、多项式小于 2ⁿ、验证机构造；
-  - `bgs_collapse` 还差 PSPACE 完全预言机的构造；
-  - `P ⊆ NP`；
-  - Razborov–Rudich 主定理（PRF 的定义和证明）。
+  - `P_ne_NP`：公开难题，永久 sorry；
+  - `bgs_collapse`：经典陈述保留为 sorry；切片定义下 NP 语言都是长度对称的（已证 `OracleNP.lengthSymmetric`），与普通 P 冲突，故需先升级 `OracleNP` 再证 collapse；
+  - `P_subset_NP`：sorry，需要 pair 解码图灵机；
+  - Razborov–Rudich 主定理（PRF）；
+  - 电路模型从公式升级为 DAG。
+
+## Is this a usable verification framework?
+
+**Partially yes for relativization-separation.** The project now has a complete, axiom-clean proof of
+Baker–Gill–Solovay *separation*, with the supporting enumeration / poly-bound / query-tree layers.
+New proofs that a language lies outside `OracleP` (or that a slice-`NP` language differs from `P`)
+can reuse this machinery.
+
+**Not yet for collapse, unrelativized `P ⊆ NP`, or natural-proof barriers.** Those need the
+full verifier `NP`, a PSPACE theory, pairing TMs, DAG circuits, and a PRF definition.

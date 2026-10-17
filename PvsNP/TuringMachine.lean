@@ -1,3 +1,4 @@
+import Mathlib.Data.Fintype.Sets
 import Mathlib.Data.Set.Defs
 import Mathlib.Order.Basic
 
@@ -107,4 +108,9 @@ theorem run_stable {x : List Bool} {t t' : ℕ} (ht : M.haltsWithin x t) (h : t 
   rw [run_add]; exact run_of_halted M ht k
 
 end TM
+
+/-- `Dir` is finite. -/
+instance : Fintype Dir :=
+  ⟨{Dir.left, Dir.right, Dir.stay}, fun x => by cases x <;> simp⟩
+
 end PvsNP
