@@ -6,13 +6,19 @@ import PvsNP.TagDecide
 /-!
 # Baker–Gill–Solovay collapse under verifier `OracleNP`
 
-`collapseA` answers `QueryKind` tags evaluated against `upspaceOracle`.
-Slice languages reduce to one `tagQueryOTM` query.
+We take `A = upspaceOracle` (PSPACE tag oracle). Then:
+* `PSPACE ⊆ OracleP A` via `tagQueryOTM` (axiom-clean once `tagQueryOTM_decides_oracle` holds);
+* `OracleNPSlice A ⊆ OracleP A` reduces to showing each slice language
+  `{x | QueryKind.eval A (.slice j q) x = true}` lies in `OracleP A`.
 
-Bridge `orun_upspace_iff_collapseA`: a machine counted in `OracleP collapseA`
-accepts under `collapseA` iff it accepts under `upspaceOracle`. This is the
-classical content that the extra tags of `collapseA` do not change the
-poly-time oracle language of interest for BGS; it is the remaining obligation.
+That last inclusion is the classical content `NP^{PSPACE} ⊆ P^{PSPACE}`
+(equivalently: poly-time existential quantification over a `P^{PSPACE}`
+predicate is still in `PSPACE`, hence in `P^{PSPACE}` via a single space tag).
+It is the **sole** remaining bridge for verifier `bgs_collapse`.
+
+With `A = upspaceOracle`, the old `orun_upspace_iff_collapseA` obligation disappears:
+`W ∈ OracleP A` is already decided under `A`, so the slice characterization matches
+`QueryKind.eval A (.slice j q)` with no oracle-agreement lemma.
 -/
 
 namespace PvsNP
@@ -35,65 +41,39 @@ theorem univ_mem_OracleP (A : List Bool → Bool) : (Set.univ : Language) ∈ Or
   refine ⟨2, 1, acceptAllOTM, 0, ?_⟩
   intro x; simpa [eval_zero] using acceptAllOTM_decides A x
 
-noncomputable def collapseA : List Bool → Bool := fun w =>
-  @decide (∃ i : ℕ, ∃ x : List Bool, w = tagEncode i x ∧
-    QueryKind.eval upspaceOracle (enumQueryKind i) x = true)
-    (Classical.propDecidable _)
+/-- Collapse oracle: the PSPACE tag oracle. -/
+noncomputable def collapseA : List Bool → Bool := upspaceOracle
 
-theorem collapseA_tag_iff (i : ℕ) (x : List Bool) :
-    collapseA (tagEncode i x) = true ↔
-      QueryKind.eval upspaceOracle (enumQueryKind i) x = true := by
-  classical
-  constructor
-  · intro h
-    have hex : ∃ i' x', tagEncode i x = tagEncode i' x' ∧
-        QueryKind.eval upspaceOracle (enumQueryKind i') x' = true :=
-      of_decide_eq_true (by simpa [collapseA] using h)
-    obtain ⟨i', x', heq, hev⟩ := hex
-    obtain ⟨rfl, rfl⟩ := tagEncode_injective heq
-    exact hev
-  · intro hev
-    exact decide_eq_true ⟨i, x, rfl, hev⟩
+theorem collapseA_eq_upspace : collapseA = upspaceOracle := rfl
 
-/-- Bridge: `orun` of `enumDecider j` agrees on `upspaceOracle` vs `collapseA`. -/
-theorem orun_upspace_iff_collapseA (j : ℕ) (y : List Bool) :
-    ((enumDecider j).M.orun upspaceOracle
-        ((enumDecider j).p.eval y.length) ((enumDecider j).M.oinit y)).cfg.state =
-      (enumDecider j).M.accept ↔
-    ((enumDecider j).M.orun collapseA
-        ((enumDecider j).p.eval y.length) ((enumDecider j).M.oinit y)).cfg.state =
-      (enumDecider j).M.accept := by
+/-- Slice language decided by `enumDecider j` under `upspaceOracle`. -/
+def sliceLang (j : ℕ) (q : ℕ[X]) : Language :=
+  {x | QueryKind.eval upspaceOracle (.slice j q) x = true}
+
+/-- **Remaining bridge for verifier `bgs_collapse`.**
+
+Classically: `sliceLang j q ∈ PSPACE` (guess/search a length-`q(|x|)` certificate in
+poly space, simulate the poly-time OTM, answer each `upspaceOracle` query by running the
+corresponding space-bounded machine), hence `sliceLang j q = spaceLang i` for some `i`
+(by surjectivity of `enumSpaceDecider` onto a concrete `SpaceDecider`), hence
+`sliceLang j q ∈ OracleP upspaceOracle` by `spaceLang_mem_OracleP`.
+
+Formalizing the universal space simulator as an explicit `TM`/`SpaceDecider` is the
+remaining work; see README.
+-/
+theorem sliceLang_mem_OracleP_upspace (j : ℕ) (q : ℕ[X]) :
+    sliceLang j q ∈ OracleP upspaceOracle := by
   sorry
 
 theorem slice_mem_OracleP_collapseA (j : ℕ) (q : ℕ[X]) :
-    ({x | QueryKind.eval upspaceOracle (.slice j q) x = true} : Language) ∈
-      OracleP collapseA := by
-  obtain ⟨i, hi⟩ := enumQueryKind_surjective (.slice j q)
-  refine ⟨i + 6, 3, tagQueryOTM i, X + C (i + 4), ?_⟩
-  intro x
-  have h := tagQueryOTM_decides_oracle i collapseA x
-  have h' :
-      (tagQueryOTM i).toTM.halted
-          ((tagQueryOTM i).orun collapseA ((X + C (i + 4)).eval x.length)
-            ((tagQueryOTM i).oinit x)).cfg ∧
-        (((tagQueryOTM i).orun collapseA ((X + C (i + 4)).eval x.length)
-            ((tagQueryOTM i).oinit x)).cfg.state = (tagQueryOTM i).accept ↔
-          collapseA (tagEncode i x) = true) := by
-    simpa [eval_add, eval_X, eval_C, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm,
-      Set.mem_setOf_eq] using h
-  constructor
-  · exact h'.1
-  · constructor
-    · intro hacc
-      have htag : collapseA (tagEncode i x) = true := h'.2.1 hacc
-      have hev := (collapseA_tag_iff i x).1 htag
-      simpa [hi] using hev
-    · intro hev
-      have htag : collapseA (tagEncode i x) = true :=
-        (collapseA_tag_iff i x).2 (by simpa [hi] using hev)
-      exact h'.2.2 htag
+    sliceLang j q ∈ OracleP collapseA := by
+  simpa [collapseA] using sliceLang_mem_OracleP_upspace j q
 
-/-- **Baker–Gill–Solovay collapse** under verifier `OracleNP`. -/
+/-- **Baker–Gill–Solovay collapse** under verifier `OracleNP`.
+
+Depends only on `sliceLang_mem_OracleP_upspace` (and the already-proved
+`tagQueryOTM_decides_oracle` via `PSPACE_subset_OracleP_tqbf` / space tags elsewhere).
+-/
 theorem bgs_collapse : ∃ A, OracleP A = OracleNP A := by
   classical
   refine ⟨collapseA, ?_⟩
@@ -104,21 +84,19 @@ theorem bgs_collapse : ∃ A, OracleP A = OracleNP A := by
     rcases h with hP | hS
     · exact hP
     · obtain ⟨W, hW, q, hq⟩ := hS
-      obtain ⟨j, hdec⟩ := OracleP.exists_enum hW
-      have hL : L = {x | QueryKind.eval upspaceOracle (.slice j q) x = true} := by
+      obtain ⟨j, hdec⟩ := OracleP.exists_enum (by simpa [collapseA] using hW)
+      have hL : L = sliceLang j q := by
         ext x
         constructor
         · intro hx
           obtain ⟨y, hy, hyW⟩ := (hq x).1 hx
-          have haccA := (hdec y).2.2 hyW
-          have haccU := (orun_upspace_iff_collapseA j y).2 haccA
-          simp only [Set.mem_setOf_eq, QueryKind.eval]
-          exact decide_eq_true ⟨y, hy, haccU⟩
+          have hacc := (hdec y).2.2 hyW
+          simp only [sliceLang, Set.mem_setOf_eq, QueryKind.eval]
+          exact decide_eq_true ⟨y, hy, hacc⟩
         · intro hev
-          simp only [Set.mem_setOf_eq, QueryKind.eval] at hev
-          obtain ⟨y, hy, haccU⟩ := of_decide_eq_true hev
-          have haccA := (orun_upspace_iff_collapseA j y).1 haccU
-          have hyW : y ∈ W := (hdec y).2.1 haccA
+          simp only [sliceLang, Set.mem_setOf_eq, QueryKind.eval] at hev
+          obtain ⟨y, hy, hacc⟩ := of_decide_eq_true hev
+          have hyW : y ∈ W := (hdec y).2.1 hacc
           exact (hq x).2 ⟨y, hy, hyW⟩
       rw [hL]
       exact slice_mem_OracleP_collapseA j q

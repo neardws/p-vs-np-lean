@@ -32,4 +32,7 @@ open PvsNP PvsNP.Natural
 #print axioms spaceLang_iff_oracle
 #print axioms tagWriting_orun
 #print axioms tagQuery_after_tag
+#print axioms tagQueryOTM_decides_oracle
+#print axioms spaceLang_mem_OracleP
+#print axioms PSPACE_subset_OracleP_tqbf
 #print axioms const_false_has_circuit

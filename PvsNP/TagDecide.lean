@@ -5,8 +5,8 @@ import PvsNP.SpaceSim
 /-!
 # Decision theorem for `tagQueryOTM`
 
-Tag-writing phase (`tagWriting_orun`) is complete. Separator bits, copy loop, and ask
-remain (same pattern as `queryCfg_step` / `queryOTM_decides`).
+Full decision proof for `tagQueryOTM_decides_oracle`: tag-writing, separator bits,
+copy loop, and ask — same pattern as `queryOTM_decides`. Axiom-clean.
 -/
 
 namespace PvsNP
@@ -182,13 +182,145 @@ theorem tagQuery_after_tag (i : ℕ) (A : List Bool → Bool) (x : List Bool) :
   rw [hc2]
   exact ⟨h2.1, h2.2.1, h2.2.2.1, h2.2.2.2⟩
 
-/-- `tagQueryOTM i` decides `{x | A (tagEncode i x) = true}` for any oracle `A`.
-Prefix `tagQuery_after_tag` is proved; copy-loop + ask follows `queryOTM_decides`
-and remains the second infrastructure bridge for `PSPACE ⊆ OracleP`. -/
+/-- Copy-phase invariant at state `i+2`: tag prefix already in `buf`, input remainder on tape. -/
+def TagCopyCfg (i : ℕ) (done rest : List Bool) (c : OCfg (Fin (i + 6)) Γ₃) : Prop :=
+  c.cfg.state.val = i + 2 ∧
+  c.buf = List.replicate i true ++ [false, true] ++ done ∧
+  c.cfg.left = (done.map encBit).reverse ∧
+  ((rest = [] ∧ c.cfg.head = 0 ∧ c.cfg.right = []) ∨
+    (∃ r rs, rest = r :: rs ∧ c.cfg.head = encBit r ∧ c.cfg.right = rs.map encBit))
+
+theorem tagCopyCfg_after_tag (i : ℕ) (A : List Bool → Bool) (x : List Bool) :
+    TagCopyCfg i [] x ((tagQueryOTM i).orun A (i + 2) ((tagQueryOTM i).oinit x)) := by
+  have h := tagQuery_after_tag i A x
+  exact ⟨h.1, by simpa using h.2.1, h.2.2.1, h.2.2.2⟩
+
+theorem tagQuery_δ_data (i : ℕ) (g : Γ₃) (hg : g ≠ 0) :
+    (tagQueryOTM i).δ ⟨i + 2, by omega⟩ g = (⟨i + 2, by omega⟩, g, Dir.right) := by
+  simp [tagQueryOTM, hg]
+
+theorem tagQuery_δ_blank (i : ℕ) :
+    (tagQueryOTM i).δ ⟨i + 2, by omega⟩ 0 = (⟨i + 3, by omega⟩, 0, Dir.stay) := by
+  simp [tagQueryOTM]
+
+theorem tagQuery_wr_data (i : ℕ) (g : Γ₃) (hg : g ≠ 0) :
+    (tagQueryOTM i).wr ⟨i + 2, by omega⟩ g = some (toBit g) := by
+  simp [tagQueryOTM, hg]
+
+theorem tagQuery_wr_blank (i : ℕ) :
+    (tagQueryOTM i).wr ⟨i + 2, by omega⟩ 0 = none := by
+  simp [tagQueryOTM]
+
+theorem tagCopyCfg_step (i : ℕ) {done : List Bool} {r : Bool} {rs : List Bool}
+    {c : OCfg (Fin (i + 6)) Γ₃} (hc : TagCopyCfg i done (r :: rs) c) :
+    TagCopyCfg i (done ++ [r]) rs ((tagQueryOTM i).plain c) := by
+  obtain ⟨hst, hbuf, hleft, htape⟩ := hc
+  rcases htape with ⟨hnil, _, _⟩ | ⟨r', rs', heq, hhead, hright⟩
+  · cases hnil
+  · obtain ⟨rfl, rfl⟩ := heq
+    have hstFin : c.cfg.state = ⟨i + 2, by omega⟩ := Fin.ext hst
+    have hnh : ¬ (tagQueryOTM i).toTM.halted c.cfg := not_halted_of_val_lt (by omega)
+    have hne : encBit r ≠ (0 : Γ₃) := encBit_ne_blank r
+    have hstep : (tagQueryOTM i).toTM.step c.cfg =
+        (tagQueryOTM i).toTM.move ⟨i + 2, by omega⟩ c.cfg.left (encBit r) c.cfg.right Dir.right := by
+      simp only [TM.step, hnh, ↓reduceIte, hstFin, hhead, tagQuery_δ_data i (encBit r) hne]
+    have hplain : (tagQueryOTM i).plain c =
+        ⟨(tagQueryOTM i).toTM.move ⟨i + 2, by omega⟩ c.cfg.left (encBit r) c.cfg.right Dir.right,
+          List.replicate i true ++ [false, true] ++ done ++ [r]⟩ := by
+      simp only [OTM.plain, hstep, hstFin, hhead, tagQuery_wr_data i (encBit r) hne, toBit_encBit,
+        Option.toList_some, hbuf, List.append_assoc]
+    rw [hplain]
+    have hblank : (tagQueryOTM i).blank = (0 : Γ₃) := rfl
+    cases rs with
+    | nil =>
+      simp [TM.move, hright, hleft, TagCopyCfg, List.map_append, List.reverse_append, hblank]
+    | cons s ss =>
+      simp [TM.move, hright, hleft, TagCopyCfg, List.map_append, List.reverse_append, hblank]
+
+theorem tagCopyCfg_orun (i : ℕ) (A : List Bool → Bool) (done rest : List Bool)
+    (c : OCfg (Fin (i + 6)) Γ₃) (hc : TagCopyCfg i done rest c) :
+    TagCopyCfg i (done ++ rest) [] ((tagQueryOTM i).orun A rest.length c) := by
+  induction rest generalizing done c with
+  | nil => simpa [OTM.orun] using hc
+  | cons r rs ih =>
+    obtain ⟨hst, hbuf, hleft, htape⟩ := hc
+    have hstFin : c.cfg.state = ⟨i + 2, by omega⟩ := Fin.ext hst
+    have hnh : ¬ (tagQueryOTM i).toTM.halted c.cfg := not_halted_of_val_lt (by omega)
+    have hneAsk : c.cfg.state ≠ (tagQueryOTM i).ask := by
+      intro h
+      have hval : c.cfg.state.val = (i + 3) := by
+        simpa [tagQueryOTM] using congrArg Fin.val h
+      omega
+    have hostep : (tagQueryOTM i).ostep A c = (tagQueryOTM i).plain c := by
+      simp only [OTM.ostep, hnh, ↓reduceIte, hneAsk, ↓reduceIte]
+    rw [List.length_cons, OTM.orun, hostep]
+    have hc' : TagCopyCfg i done (r :: rs) c := ⟨hst, hbuf, hleft, htape⟩
+    simpa [List.append_assoc] using ih (done ++ [r]) _ (tagCopyCfg_step i hc')
+
+/-- `tagQueryOTM i` decides `{x | A (tagEncode i x) = true}` for any oracle `A`. -/
 theorem tagQueryOTM_decides_oracle (i : ℕ) (A : List Bool → Bool) :
     ODecidesInTime (tagQueryOTM i) A
       {x | A (tagEncode i x) = true} (fun n => i + n + 4) := by
-  sorry
+  intro x
+  have hc0 := tagCopyCfg_after_tag i A x
+  have hc : TagCopyCfg i x []
+      ((tagQueryOTM i).orun A x.length
+        ((tagQueryOTM i).orun A (i + 2) ((tagQueryOTM i).oinit x))) := by
+    simpa using tagCopyCfg_orun i A [] x _ hc0
+  have hsplit :
+      (tagQueryOTM i).orun A (i + 2 + x.length) ((tagQueryOTM i).oinit x) =
+        (tagQueryOTM i).orun A x.length
+          ((tagQueryOTM i).orun A (i + 2) ((tagQueryOTM i).oinit x)) := by
+    rw [OTM.orun_add]
+  rw [← hsplit] at hc
+  obtain ⟨hst, hbuf, _, htape⟩ := hc
+  have hhead :
+      ((tagQueryOTM i).orun A (i + 2 + x.length) ((tagQueryOTM i).oinit x)).cfg.head = 0 := by
+    rcases htape with ⟨_, h, _⟩ | ⟨_, _, heq, _, _⟩
+    · exact h
+    · cases heq
+  set cCopy := (tagQueryOTM i).orun A (i + 2 + x.length) ((tagQueryOTM i).oinit x)
+  have hstFin : cCopy.cfg.state = ⟨i + 2, by omega⟩ := Fin.ext hst
+  have hnh0 : ¬ (tagQueryOTM i).toTM.halted cCopy.cfg := not_halted_of_val_lt (by omega)
+  have hneAsk0 : cCopy.cfg.state ≠ (tagQueryOTM i).ask := by
+    intro h
+    have hval : cCopy.cfg.state.val = (i + 3) := by
+      simpa [tagQueryOTM] using congrArg Fin.val h
+    omega
+  have h1 : (tagQueryOTM i).ostep A cCopy = (tagQueryOTM i).plain cCopy := by
+    simp only [OTM.ostep, hnh0, ↓reduceIte, hneAsk0, ↓reduceIte]
+  have hask_state : ((tagQueryOTM i).plain cCopy).cfg.state = ⟨i + 3, by omega⟩ := by
+    have hstep : (tagQueryOTM i).toTM.step cCopy.cfg =
+        (tagQueryOTM i).toTM.move ⟨i + 3, by omega⟩ cCopy.cfg.left 0 cCopy.cfg.right Dir.stay := by
+      simp only [TM.step, hnh0, ↓reduceIte, hstFin, hhead, tagQuery_δ_blank]
+    simp only [OTM.plain, hstep, TM.move]
+  have hask_buf : ((tagQueryOTM i).plain cCopy).buf = tagEncode i x := by
+    simp only [OTM.plain, TM.step, hnh0, ↓reduceIte, hstFin, hhead, tagQuery_δ_blank, TM.move,
+      tagQuery_wr_blank, Option.toList_none, List.append_nil, hbuf, tagEncode]
+  set cAsk := (tagQueryOTM i).plain cCopy
+  have hnhA : ¬ (tagQueryOTM i).toTM.halted cAsk.cfg := by
+    refine not_halted_of_val_lt ?_
+    have hsv : cAsk.cfg.state.val = i + 3 := by
+      change ((tagQueryOTM i).plain cCopy).cfg.state.val = i + 3
+      exact congrArg Fin.val hask_state
+    omega
+  have haskEq : cAsk.cfg.state = (tagQueryOTM i).ask := by
+    simp only [tagQueryOTM]; exact hask_state
+  have h2 : (tagQueryOTM i).ostep A cAsk =
+      (tagQueryOTM i).answer cAsk (A (tagEncode i x)) := by
+    simp only [OTM.ostep, hnhA, haskEq, ↓reduceIte, hask_buf]
+  have hfinal :
+      (tagQueryOTM i).orun A (i + x.length + 4) ((tagQueryOTM i).oinit x) =
+        (tagQueryOTM i).answer cAsk (A (tagEncode i x)) := by
+    have hsum : i + x.length + 4 = (i + 2 + x.length) + 2 := by omega
+    rw [hsum, OTM.orun_add, OTM.orun, h1, OTM.orun, h2]
+    rfl
+  constructor
+  · rw [hfinal]
+    cases hA : A (tagEncode i x) <;> simp [OTM.answer, TM.halted, tagQueryOTM]
+  · rw [hfinal]
+    cases hA : A (tagEncode i x) <;> simp [OTM.answer, tagQueryOTM, hA]
+
 
 theorem tagQueryOTM_decides (i : ℕ) :
     ODecidesInTime (tagQueryOTM i) upspaceOracle (spaceLang i)
