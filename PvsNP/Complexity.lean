@@ -89,8 +89,15 @@ theorem not_satisfiable_of_nil_mem {φ : CNF} (h : [] ∈ φ) : ¬ φ.Satisfiabl
 /-- coNP is exactly the set of complements of NP languages (definitional unfolding). -/
 theorem mem_coNP_iff (L : Language) : L ∈ coNP ↔ Lᶜ ∈ NP := Iff.rfl
 
-/-- **P ⊆ NP.** Pending: needs a TM that decodes `pair x y` and simulates the P-machine on `x`,
-ignoring the certificate (or using an empty certificate with `q = 0`). -/
+/-- **P ⊆ NP.**
+
+**Blocked on a pairing-decoder TM.** The classical proof takes an empty certificate (`q = 0`) and
+the verifier language `V = { pair x [] | x ∈ L }`. Showing `V ∈ P` from `L ∈ P` requires a machine
+that (1) checks its input is a well-formed `pair x []` and (2) simulates the original P-decider on
+`x`. Step (2) is a universal/product TM construction that this development does not yet have.
+
+Relativized analogue `OracleP_subset_OracleNP` **is** proved (by the union definition of `OracleNP`).
+-/
 theorem P_subset_NP : P ⊆ NP := by
   sorry
 

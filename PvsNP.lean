@@ -5,6 +5,8 @@ import PvsNP.QueryDiag
 import PvsNP.PolyBound
 import PvsNP.Relativization
 import PvsNP.Enumeration
+import PvsNP.Pairing
+import PvsNP.OracleVerifiers
 import PvsNP.Verifier
 import PvsNP.Collapse
 import PvsNP.NaturalProofs

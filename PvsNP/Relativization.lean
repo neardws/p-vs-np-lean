@@ -25,8 +25,9 @@ is *not* true by definition.
   with an empty buffer). Together with `exists_oracle_diag` this is the core of `∃ B, P^B ≠ NP^B`.
 
 ## Status
-* `bgs_separation` is proved in `PvsNP.Verifier` (enumeration + poly-vs-exp + diagonalization).
-* `bgs_collapse` is pending: needs a PSPACE-complete / self-simulation oracle.
+* `OracleNP` is the verifier-based class `OracleP ∪ OracleNPSlice` (see definitions below).
+* `bgs_separation` is proved in `PvsNP.Verifier`.
+* `bgs_collapse` is pending on the PSPACE bridge lemmas in `PvsNP.Collapse`.
 -/
 
 namespace PvsNP
@@ -138,22 +139,38 @@ def ODecidesInTime {Q Γ : Type} [DecidableEq Q] (M : OTM Q Γ) (A : List Bool �
 def OracleP (A : List Bool → Bool) : Set Language :=
   {L | ∃ (k m : ℕ) (M : OTM (Fin k) (Fin m)) (p : ℕ[X]), ODecidesInTime M A L (fun n => p.eval n)}
 
-/-- `NP^A` in the **existential poly-length oracle-slice** form
-`∃ q, ∀ x, x ∈ L ↔ ∃ y, |y| = q(|x|) ∧ A y`.
-This is a subclass of the usual verifier-based `NP^A`; the classical BGS test language
-lies in it, so separation yields the classical theorem. (Full verifier form: see README.) -/
+/-- The BGS test language `L_B = {x | ∃ y ∈ B, |y| = |x|}`. -/
+def testLang (B : List Bool → Bool) : Language :=
+  {x | ∃ y : List Bool, y.length = x.length ∧ B y = true}
+
+/-- X-oblivious existential slice over a language in `OracleP A`:
+`∃ W ∈ P^A, ∃ q, x ∈ L ↔ ∃ y, |y| = q(|x|) ∧ y ∈ W`. -/
+def OracleNPSlice (A : List Bool → Bool) : Set Language :=
+  {L | ∃ W ∈ OracleP A, ∃ q : ℕ[X],
+    ∀ x, x ∈ L ↔ ∃ y : List Bool, y.length = q.eval x.length ∧ y ∈ W}
+
+/-- Full pair-based verifier form of `NP^A`:
+`∃ W ∈ P^A, ∃ q, x ∈ L ↔ ∃ y, |y| = q(|x|) ∧ pair x y ∈ W`. -/
+def OracleNPPair (A : List Bool → Bool) : Set Language :=
+  {L | ∃ W ∈ OracleP A, ∃ q : ℕ[X],
+    ∀ x, x ∈ L ↔ ∃ y : List Bool, y.length = q.eval x.length ∧ pair x y ∈ W}
+
+/-- **Verifier-based `NP^A`.**
+
+We take `OracleNP A = OracleP A ∪ OracleNPSlice A`. This is the fragment of classical
+`NP^A` consisting of (i) deterministic poly-time oracle languages and (ii) x-oblivious
+existential quantification over a `P^A` witness language. It properly contains the old
+raw-oracle slice `{∃ y, |y|=q(|x|) ∧ A y}` once `queryLang A ∈ OracleP A`, and it
+contains `OracleP A` itself (needed for collapse and for relativized `P ⊆ NP`).
+
+The fully x-aware form `OracleNPPair` (certificate `pair x y`) is recorded above; embedding
+`OracleNPSlice` into it needs a pairing-decoder OTM (`pairYQueryOTM`), tracked as future work.
+-/
 def OracleNP (A : List Bool → Bool) : Set Language :=
-  {L | ∃ q : ℕ[X], ∀ x, x ∈ L ↔ ∃ y : List Bool, y.length = q.eval x.length ∧ A y = true}
+  OracleP A ∪ OracleNPSlice A
 
-/-- The BGS test language `L_B = {x | ∃ y ∈ B, |y| = |x|}` (trivially in `NP^B`). -/
-def testLang (B : List Bool → Bool) : Language := {x | ∃ y : List Bool, y.length = x.length ∧ B y = true}
-
-/-- **Baker–Gill–Solovay (1975), collapse** (classical statement).
-
-Under the *current slice form* of `OracleNP`, this statement is in fact **false**:
-see `no_collapse_for_slice` in `PvsNP.Collapse` (pending one TM-simulation `sorry`).
-The classical theorem requires upgrading `OracleNP` to the full verifier form, then
-taking a PSPACE-complete oracle. Kept as `sorry` as the classical target statement. -/
+/-- **Baker–Gill–Solovay (1975), collapse.** Target: a PSPACE-complete oracle.
+See `PvsNP.Collapse` for the scaffolding. -/
 theorem bgs_collapse : ∃ A, OracleP A = OracleNP A := sorry
 
 end PvsNP

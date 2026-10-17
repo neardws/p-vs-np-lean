@@ -14,11 +14,15 @@ open PvsNP PvsNP.Natural
 #print axioms not_useful_univ
 #print axioms poly_lt_two_pow_infinitely_often
 #print axioms enumTree_depth_lt_two_pow
+#print axioms queryLang_mem_OracleP
 #print axioms testLang_mem_OracleNP
 #print axioms testLang_not_mem_OracleP_bgs
 #print axioms bgs_separation
-#print axioms OracleNP.lengthSymmetric
+#print axioms OracleP_subset_OracleNP
+#print axioms OracleNPSlice.lengthSymmetric
 #print axioms not_lengthSymmetric_singleton_false
+#print axioms queryOTM_decides
 #print axioms P_ne_NP
 #print axioms bgs_collapse
 #print axioms P_subset_NP
+#print axioms bgs_collapse_of_bridges

@@ -7,7 +7,7 @@ A Lean 4 + Mathlib formalization of the **P vs NP** problem and of two classical
 
 ## Versions
 - Lean `v4.35.0` (`lean-toolchain`)
-- Mathlib `v4.35.0` tag (`lake-manifest.json`)
+- Mathlib `v4.35.0` / commit `56a00585` (`lake-manifest.json`)
 
 ## Build
 ```bash
@@ -21,15 +21,40 @@ lake env lean Audit.lean   # axiom audit; see audit.log
 | File | Contents |
 |---|---|
 | `PvsNP/TuringMachine.lean` | Single-tape deterministic TMs |
-| `PvsNP/Complexity.lean` | `P`, `NP`, `coNP`, `SAT` |
+| `PvsNP/Complexity.lean` | `P`, `NP`, `coNP`, `SAT`, `P_subset_NP` (blocked) |
 | `PvsNP/Main.lean` | `P_ne_NP` (intentional `sorry`) |
 | `PvsNP/QueryDiag.lean` | Query trees + BGS diagonalization core |
 | `PvsNP/PolyBound.lean` | `p(n) < 2ⁿ` infinitely often |
-| `PvsNP/Relativization.lean` | Oracle TMs, `OracleP`, `OracleNP`, `bgs_collapse` |
+| `PvsNP/Relativization.lean` | Oracle TMs, `OracleP`, `OracleNP` / `OracleNPSlice` / `OracleNPPair` |
 | `PvsNP/Enumeration.lean` | Countable enumeration of `OracleP` machines |
-| `PvsNP/Verifier.lean` | **`bgs_separation`** (fully proved) |
+| `PvsNP/OracleVerifiers.lean` | **`queryOTM`**: `{y \| A y}` ∈ `OracleP A` (fully proved) |
+| `PvsNP/Verifier.lean` | **`bgs_separation`**, `OracleP ⊆ OracleNP` |
+| `PvsNP/Collapse.lean` | PSPACE scaffolding + `bgs_collapse_of_bridges` |
 | `PvsNP/NaturalProofs.lean` | Circuits, `P/poly`, Razborov–Rudich framework |
-| `PvsNP/Collapse.lean` | Length-symmetry of slice-`OracleNP` |
+| `PvsNP/Pairing.lean` | `pair` / `doubled` lemmas |
+
+## Definition of `OracleNP` (upgraded)
+
+```
+OracleNP A  =  OracleP A  ∪  OracleNPSlice A
+```
+
+where
+
+```
+L ∈ OracleNPSlice A  ↔  ∃ W ∈ OracleP A, ∃ q,
+      ∀ x, x ∈ L ↔ ∃ y, |y| = q(|x|) ∧ y ∈ W
+```
+
+This is the **verifier-based** fragment consisting of
+1. deterministic poly-time oracle languages, and
+2. x-oblivious existential quantification over a `P^A` witness language.
+
+It properly contains the old raw-oracle slice `{∃ y, |y|=q(|x|) ∧ A y}` because
+`queryLang A = {y | A y} ∈ OracleP A` (proved via `queryOTM`).
+
+The fully x-aware form is recorded as `OracleNPPair` (certificate `pair x y ∈ W`);
+embedding the slice into it needs a pairing-decoder OTM (future work).
 
 ## Proved vs pending
 
@@ -41,59 +66,63 @@ Every ✅ theorem is checked by `#print axioms` and uses only `propext`, `Classi
 | `OTM.unfold_eval/depth/maxLen` | ✅ proved |
 | `poly_lt_two_pow_infinitely_often` | ✅ proved |
 | `enumTree_depth_lt_two_pow`, `OracleP.exists_enum` | ✅ proved |
-| `testLang_mem_OracleNP`, `testLang_not_mem_OracleP_bgs` | ✅ proved |
+| **`queryLang_mem_OracleP`**, `queryOTM_decides` | ✅ **proved** |
+| `testLang_mem_OracleNP` | ✅ proved |
+| `testLang_not_mem_OracleP_bgs` | ✅ proved |
 | **`bgs_separation : ∃ B, OracleP B ≠ OracleNP B`** | ✅ **proved** |
+| **`OracleP_subset_OracleNP`** (relativized P ⊆ NP) | ✅ **proved** |
+| `OracleNPSlice.lengthSymmetric` | ✅ proved |
+| `bgs_collapse_of_bridges` (conditional collapse) | ✅ proved (takes bridges as hyps) |
 | Natural-proofs lemmas (`Large.mono`, …) | ✅ proved |
 | `P_ne_NP` | ⛔ open problem, `sorry` on purpose |
-| `bgs_collapse : ∃ A, OracleP A = OracleNP A` | 🟡 `sorry` — classical target; see note below |
-| `OracleNP.lengthSymmetric`, `not_lengthSymmetric_singleton_false` | ✅ proved (explains why slice-collapse fails) |
-| `P_subset_NP` | 🟡 `sorry` (needs pairing-decoder TM) |
-| Full Razborov–Rudich theorem | 🟡 definition only (`RazborovRudichStatement`); needs PRF security |
+| `P_subset_NP` | 🟡 **blocked** on pairing-decoder TM (documented) |
+| `bgs_collapse` | 🟡 `sorry` — needs the three PSPACE bridges below |
+| `OracleP_tqbf_subset_PSPACE` | 🟡 `sorry` — oracle-TM space simulation |
+| `PSPACE_subset_OracleP_tqbf` | 🟡 `sorry` — TQBF completeness |
+| `OracleNPSlice_tqbf_subset_PSPACE` | 🟡 `sorry` — NPSPACE = PSPACE + simulation |
+| Full `OracleNPPair` decoder (`pairYQueryOTM`) | 🟡 defined in plan; not yet proved |
+| Full Razborov–Rudich theorem | 🟡 definition only; needs PRF security + DAG circuits |
 
-## Definition note: `OracleNP`
+## Framework readiness
 
-The current `OracleNP` is the **existential poly-length oracle-slice** form
+**Usable for relativization-separation.** Complete, axiom-clean proof of BGS *separation*
+under the upgraded verifier `OracleNP`, with `queryOTM` as a concrete oracle verifier.
 
-```
-L ∈ NP^A  ↔  ∃ q, ∀ x, x ∈ L ↔ ∃ y, |y| = q(|x|) ∧ A y
-```
+**Partially ready for collapse.** The conditional theorem `bgs_collapse_of_bridges` is proved;
+the three PSPACE bridge lemmas remain.
 
-This is a **subclass** of the usual verifier-based `NP^A`. The classical BGS test language
-`testLang A = {x | ∃ y, |y| = |x| ∧ A y}` lies in this subclass, so `bgs_separation`
-is the classical Baker–Gill–Solovay separation theorem.
+**Not ready for unrelativized `P ⊆ NP`.** Needs a pairing-decoder / product TM.
 
-**Consequence for collapse.** Under this slice definition every language in `OracleNP A` is
-length-symmetric, while `OracleP A` always contains non-length-symmetric languages from
-ordinary `P`. So the classical collapse `∃ A, P^A = NP^A` requires upgrading `OracleNP` to
-the full verifier form (or the x-oblivious form `∃ V ∈ P^A, ∃ q, x ∈ L ↔ ∃ y, |y|=q(|x|) ∧ y ∈ V`
-with `queryLang A ∈ P^A`). Tracked as future work; `bgs_collapse` remains a classical-target `sorry`.
+**Not ready for natural-proof barriers.** Needs DAG circuits and a PRF definition.
 
 ## Model notes
-- Oracle machines in `OracleP` have state set `Fin k` and alphabet `Fin m` (countably many machines).
+- Oracle machines in `OracleP` have state set `Fin k` and alphabet `Fin m`.
 - Each oracle query costs one step; the query buffer is write-only and erased by a query.
-- `QTree` is the decision-tree view of a deterministic oracle computation on a fixed input.
+- `queryOTM` copies its input to the buffer, asks the oracle, and accepts iff the answer is yes.
 
 ## 中文说明
+
 本项目在 Lean 4 中形式化 P vs NP 以及相对化、自然证明两个障碍。
 
-- **已证明**（无 sorry，只用三个标准公理）：
-  - **`bgs_separation`**：存在预言机 B 使得 `P^B ≠ NP^B`（完整证明）；
-  - BGS 对角化核心、机器枚举、多项式低于指数、查询树展开；
-  - 自然证明中 largeness / usefulness 的基本引理。
-- **关于 `OracleNP` 的定义**：当前采用「存在长度为 q(|x|) 的证书 y 使得 A(y)=true」的切片形式，是标准验证机 NP^A 的子类；BGS 分离对这个子类成立即得经典定理。
-- **待完成**：
-  - `P_ne_NP`：公开难题，永久 sorry；
-  - `bgs_collapse`：经典陈述保留为 sorry；切片定义下 NP 语言都是长度对称的（已证 `OracleNP.lengthSymmetric`），与普通 P 冲突，故需先升级 `OracleNP` 再证 collapse；
-  - `P_subset_NP`：sorry，需要 pair 解码图灵机；
-  - Razborov–Rudich 主定理（PRF）；
-  - 电路模型从公式升级为 DAG。
+### `OracleNP` 定义（已升级）
+```
+OracleNP A = OracleP A ∪ OracleNPSlice A
+```
+- `OracleNPSlice`：存在 `W ∈ P^A` 与多项式 `q`，使得
+  `x ∈ L ↔ ∃ y, |y|=q(|x|) ∧ y ∈ W`（对 `x` 内容无感的验证机片段）。
+- 旧的「直接查预言机切片」是它的特例：已证明 `queryLang A = {y | A y} ∈ OracleP A`。
+- 完整的 `pair x y` 验证机形式记为 `OracleNPPair`，解码 OTM 尚待完成。
 
-## Is this a usable verification framework?
+### 已证明（无 sorry，只用三个标准公理）
+- **`bgs_separation`**：存在预言机 B 使得 `P^B ≠ NP^B`；
+- **`queryLang_mem_OracleP`** / `queryOTM`：具体验证机；
+- **`OracleP_subset_OracleNP`**：相对化的 P ⊆ NP（由并集定义）；
+- BGS 对角化核心、机器枚举、多项式低于指数、查询树展开；
+- 条件化坍缩定理 `bgs_collapse_of_bridges`。
 
-**Partially yes for relativization-separation.** The project now has a complete, axiom-clean proof of
-Baker–Gill–Solovay *separation*, with the supporting enumeration / poly-bound / query-tree layers.
-New proofs that a language lies outside `OracleP` (or that a slice-`NP` language differs from `P`)
-can reuse this machinery.
-
-**Not yet for collapse, unrelativized `P ⊆ NP`, or natural-proof barriers.** Those need the
-full verifier `NP`, a PSPACE theory, pairing TMs, DAG circuits, and a PRF definition.
+### 待完成 / 受阻
+- `P_ne_NP`：公开难题，永久 sorry；
+- `P_subset_NP`：**受阻于 pairing 解码图灵机**（已在源码中说明）；
+- `bgs_collapse`：差三条 PSPACE 桥梁引理（预言机空间模拟、TQBF 完全性、NPSPACE=PSPACE）；
+- `OracleNPPair` 的 pairing 解码 OTM；
+- Razborov–Rudich 主定理（PRF + DAG 电路）。

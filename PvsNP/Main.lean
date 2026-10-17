@@ -3,10 +3,7 @@ import PvsNP.Complexity
 /-!
 # The P vs NP problem
 
-The top-level statement of the project. `P_ne_NP` is the famous open problem and is the
-permanent `sorry` of the development (unless someone solves it). The other `sorry`s
-(`bgs_separation`, `bgs_collapse` in `PvsNP.Relativization`) are work in progress and are listed
-in the README.
+`P_ne_NP` is the famous open problem and the permanent intentional `sorry` of the development.
 -/
 
 namespace PvsNP

@@ -1,16 +1,14 @@
 import Mathlib.Algebra.Polynomial.Basic
 import Mathlib.Algebra.Polynomial.Eval.Defs
-import Mathlib.Data.Fintype.Card
-import Mathlib.Data.Fintype.Pi
-import Mathlib.Data.Fintype.Option
 import PvsNP.Enumeration
+import PvsNP.OracleVerifiers
 
 /-!
 # Baker–Gill–Solovay separation
 
-`OracleNP` (in `Relativization`) uses the x-oblivious exact-length verifier form once
-`queryLang_mem_OracleP` is available; until the TM simulation below is complete we keep
-the slice form and the already-proved `bgs_separation`.
+Under the upgraded verifier-based `OracleNP = OracleP ∪ OracleNPSlice`, the classical
+test language still sits in `OracleNP` via `queryLang ∈ OracleP`, and the existing
+diagonalization shows it lies outside `OracleP`.
 -/
 
 namespace PvsNP
@@ -20,9 +18,16 @@ open Polynomial Function
 def unary (n : ℕ) : List Bool := List.replicate n true
 @[simp] theorem unary_length (n : ℕ) : (unary n).length = n := List.length_replicate
 
+/-- The BGS test language is in the slice fragment (hence in `OracleNP`). -/
+theorem testLang_mem_OracleNPSlice (B : List Bool → Bool) :
+    testLang B ∈ OracleNPSlice B := by
+  refine ⟨queryLang B, queryLang_mem_OracleP B, X, ?_⟩
+  intro x
+  simp [testLang, queryLang, eval_X]
+
 theorem testLang_mem_OracleNP (B : List Bool → Bool) :
     testLang B ∈ OracleNP B :=
-  ⟨X, fun x => by simp [testLang, Polynomial.eval_X]⟩
+  Or.inr (testLang_mem_OracleNPSlice B)
 
 theorem unfold_decides_testLang {k m : ℕ} {M : OTM (Fin k) (Fin m)}
     {B : List Bool → Bool} {p : ℕ[X]}
@@ -67,5 +72,9 @@ theorem bgs_separation : ∃ B, OracleP B ≠ OracleNP B := by
   have hin : testLang bgsOracle ∈ OracleNP bgsOracle := testLang_mem_OracleNP _
   rw [← hEq] at hin
   exact testLang_not_mem_OracleP_bgs hin
+
+/-- Relativized `P ⊆ NP`: `OracleP A ⊆ OracleNP A` by construction of the union. -/
+theorem OracleP_subset_OracleNP (A : List Bool → Bool) : OracleP A ⊆ OracleNP A :=
+  fun _ h => Or.inl h
 
 end PvsNP
