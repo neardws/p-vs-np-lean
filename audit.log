@@ -23,4 +23,6 @@ warning: mathlib: repository has local changes:
 'PvsNP.tagQueryOTM_decides_oracle' depends on axioms: [propext, Classical.choice, Quot.sound]
 'PvsNP.spaceLang_mem_OracleP' depends on axioms: [propext, Classical.choice, Quot.sound]
 'PvsNP.PSPACE_subset_OracleP_tqbf' depends on axioms: [propext, Classical.choice, Quot.sound]
+'PvsNP.kindLang_mem_OracleP_hardSlice' depends on axioms: [propext, Classical.choice, Quot.sound]
+'PvsNP.upSliceLang_mem_OracleP_hardSlice' depends on axioms: [propext, Classical.choice, Quot.sound]
 'PvsNP.Natural.const_false_has_circuit' depends on axioms: [propext]

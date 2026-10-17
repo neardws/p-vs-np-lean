@@ -10,5 +10,6 @@ import PvsNP.OracleVerifiers
 import PvsNP.Verifier
 import PvsNP.SpaceSim
 import PvsNP.TagDecide
+import PvsNP.HardSlice
 import PvsNP.Collapse
 import PvsNP.NaturalProofs

@@ -31,6 +31,7 @@ lake env lean Audit.lean   # axiom audit; see audit.log
 | `PvsNP/Verifier.lean` | **`bgs_separation`** under verifier `OracleNP` ✅ |
 | `PvsNP/SpaceSim.lean` | `PSPACE`, `upspaceOracle`, `QueryKind`, `tagQueryOTM` |
 | `PvsNP/TagDecide.lean` | **`tagQueryOTM_decides_oracle` ✅** (tag + copy + ask) |
+| `PvsNP/HardSlice.lean` | `hardSliceOracle` + `kindLang ∈ OracleP` via `tagQueryOTM` |
 | `PvsNP/Collapse.lean` | Verifier `bgs_collapse` via `collapseA = upspaceOracle` |
 | `PvsNP/NaturalProofs.lean` | Circuits + Razborov–Rudich framework |
 
@@ -70,20 +71,23 @@ Semantic lemmas in `PvsNP/Collapse.lean` (axiom-clean):
 - `sliceLang_mem_OracleP_of_space_decider` — any matching `SpaceDecider` lands in `OracleP`
 
 **Gap (one `sorry`):** compile the classical `NP^{PSPACE} ⊆ PSPACE` simulator to an
-explicit `SpaceDecider` (or an equivalent certificate-search `OTM` with oracle
-passthrough to `upspaceOracle`):
+explicit `SpaceDecider` / passthrough certificate-search `OTM`, **or** finish the
+length-WF pad-tag path:
 
-1. Enumerate `y ∈ {0,1}^{q(|x|)}` reusing space.
-2. Simulate `enumDecider j` for `p(|y|)` steps; answer space-tags via nested
-   `acceptsInSpace` (or passthrough asks if building an `OTM` directly).
-3. Accept iff some certificate accepts; set `d = sliceSpaceDegree j q`.
+1. Enumerate `y ∈ {0,1}^{q(|x|)}` reusing space (SpaceDecider), **or**
+2. Write padded kind-tag `1^{n^D+D+1}0 ++ tagEncode i x` and ask once (`satTagOTM`).
+
+**Partial progress (`PvsNP/HardSlice.lean`, axiom-clean):**
+- `hardSliceOracle` answers `tagEncode i x` by `QueryKind.eval upspaceOracle`.
+- `kindLang κ` / `upSliceLang j q` ∈ `OracleP hardSliceOracle` via `tagQueryOTM`.
+- This is necessary but not sufficient for verifier collapse: an arbitrary
+  `OracleNPSlice` witness `W ∈ OracleP A` need not be a single `QueryKind`
+  language, so either self-referential pad-tags + `satTagOTM` (variable `n^D` pad
+  writer) or the SpaceDecider microcode remains.
 
 Until that TM/`OTM` table exists, `#print axioms bgs_collapse` lists `sorryAx`.
-**`bgs_separation` does not. `tagQueryOTM_decides_oracle` does not.**
-
-Alternative formalization path (not started): length-well-founded **hard-slice tag**
-oracle + `sliceTagOTM` (write pad + header + `x`, one ask) — avoids a universal
-space simulator but needs a variable-length padding writer `OTM` and WF oracle lemmas.
+**`bgs_separation` does not. `tagQueryOTM_decides_oracle` does not.
+`kindLang_mem_OracleP_hardSlice` does not.**
 
 ## Framework readiness
 
@@ -103,6 +107,9 @@ infrastructure is complete.
 - **`OracleNP A = OracleP A ∪ OracleNPSlice A`**：验证器形式（项目定义）。
 - **`bgs_separation`**：已无 `sorryAx`（验证器 `OracleNP`）。
 - **`tagQueryOTM_decides_oracle`**：标签写入 + 拷贝循环 + 询问，已完整证明（公理干净）。
-- **`bgs_collapse`**：`collapseA = upspaceOracle`；只剩 `exists_slice_space_decider`
-  （把 `NP^{PSPACE} ⊆ PSPACE` 编成显式 `SpaceDecider` / 直通 `OTM`）。语义引理已齐。
+- **`hardSliceOracle` / `kindLang_mem_OracleP_hardSlice`**：公理干净；把每个
+  `QueryKind` 语言（含 upspace 切片）放进 `OracleP hardSliceOracle`。
+- **`bgs_collapse`**：仍依赖 `exists_slice_space_decider`（或尚未完成的
+  length-WF `satTagOTM`）。`hardSlice` 还不够：任意 `OracleNPSlice` 见证不必是
+  单个 `QueryKind` 语言。
 - **`P_ne_NP`**：故意保留的公开问题 `sorry`。

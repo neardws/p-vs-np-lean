@@ -87,7 +87,8 @@ theorem sliceLang_mem_OracleP_of_space_decider (j : ℕ) (q : ℕ[X])
     sliceLang j q ∈ OracleP upspaceOracle :=
   PSPACE_subset_OracleP_tqbf ⟨s, fun x => (hs x).symm⟩
 
-/-- **Gap:** compile the following algorithm to an explicit `SpaceDecider`.
+/-- **Gap:** compile the following algorithm to an explicit `SpaceDecider`
+(or the length-WF pad-tag OTM sketched in `PvsNP/HardSlice.lean` / README).
 
 1. On input `x`, set `m := q.eval |x|`; enumerate all `y ∈ {0,1}^m` (reuse space).
 2. For each `y`, simulate `(enumDecider j).M` for `queryBudget j m` steps.
@@ -95,9 +96,12 @@ theorem sliceLang_mem_OracleP_of_space_decider (j : ℕ) (q : ℕ[X])
    `acceptsInSpace (enumSpaceDecider i).M z (…)`; else `false`.
 4. Accept iff some certificate simulation accepts.
 
-This is `NP^{PSPACE} ⊆ PSPACE`. Equivalent alternative: an oracle-passthrough
-`OTM` that searches certificates and delegates asks to `upspaceOracle`, placing
-`sliceLang` directly in `OracleP upspaceOracle` without a space intermediate.
+This is `NP^{PSPACE} ⊆ PSPACE`. Alternative (HardSlice): non-circular
+`hardSliceOracle` already places every `kindLang` / `upSliceLang` into
+`OracleP hardSliceOracle` via `tagQueryOTM`, but verifier collapse still needs
+either this SpaceDecider or a length-WF self-referential pad-tag OTM so that
+arbitrary `OracleNPSlice` witnesses (not just `QueryKind` languages) land in
+`OracleP`.
 -/
 theorem exists_slice_space_decider (j : ℕ) (q : ℕ[X]) :
     ∃ s : SpaceDecider,

@@ -37,4 +37,6 @@ open PvsNP PvsNP.Natural
 #print axioms tagQueryOTM_decides_oracle
 #print axioms spaceLang_mem_OracleP
 #print axioms PSPACE_subset_OracleP_tqbf
+#print axioms kindLang_mem_OracleP_hardSlice
+#print axioms upSliceLang_mem_OracleP_hardSlice
 #print axioms const_false_has_circuit
