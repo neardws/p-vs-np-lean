@@ -2,32 +2,18 @@ import PvsNP.Complexity
 import PvsNP.QueryDiag
 
 /-!
-# Relativization: oracle Turing machines and the Baker–Gill–Solovay theorems
-
-This file is the relativization-barrier layer of the project. It extends the machine model of
-`PvsNP.TuringMachine` with an oracle and defines `P^A`, `NP^A`.
+# Relativization: oracle Turing machines and Baker–Gill–Solovay
 
 ## Model
-An oracle machine (`OTM`) is a single-tape TM together with
-* a write-only **query buffer**: on every ordinary step the machine may append one bit to it
-  (`wr : Q → Γ → Option Bool`);
-* a distinguished state `ask`. In state `ask` one step consults the oracle `A` on the current
-  buffer, moves to `yes`/`no` accordingly and clears the buffer.
+An oracle machine (`OTM`) is a single-tape TM with a write-only query buffer and a
+distinguished `ask` state.
 
-This is the standard oracle-TM model (query tape is write-only and erased by a query) and costs
-one step per oracle call. Machines in `OracleP` use state set `Fin k` and alphabet `Fin m`, so
-there are only countably many machines: `P^A` is a genuinely uniform class, and `P^A = NP^A`
-is *not* true by definition.
-
-## What is proved here
-* `OTM.unfold_eval`, `OTM.unfold_depth`, `OTM.unfold_maxLen`: a `t`-step oracle computation is a
-  query tree (`PvsNP.QTree`) of depth `≤ t` that asks only strings of length `≤ t` (when started
-  with an empty buffer). Together with `exists_oracle_diag` this is the core of `∃ B, P^B ≠ NP^B`.
-
-## Status
-* `OracleNP` is the classical raw-slice class `OracleP ∪ OracleNPRawSlice`.
-* `bgs_separation` is proved in `PvsNP.Verifier`.
-* `bgs_collapse` is proved in `PvsNP.Collapse` (via `trivialOracle`).
+## `NP^A` (verifier form)
+`OracleNP A = OracleP A ∪ OracleNPSlice A`, where
+`OracleNPSlice A` means: certificates of poly length are checked by a language in `OracleP A`
+(x-oblivious slice). The stronger pair form `OracleNPPair` (check `pair x y ∈ W`) is retained
+for documentation. Raw-slice `OracleNPRawSlice` is the classical BGS test-language fragment
+only; it is **not** the project definition of `OracleNP`.
 -/
 
 namespace PvsNP
@@ -50,29 +36,23 @@ namespace OTM
 
 variable {Q Γ : Type} [DecidableEq Q] (M : OTM Q Γ)
 
-/-- Configuration after an oracle answer `b`. -/
 def answer (c : OCfg Q Γ) (b : Bool) : OCfg Q Γ :=
   ⟨{ c.cfg with state := if b then M.yes else M.no }, []⟩
 
-/-- An ordinary (non-query) step: TM transition plus optional buffer write. -/
 def plain (c : OCfg Q Γ) : OCfg Q Γ :=
   ⟨M.toTM.step c.cfg, c.buf ++ (M.wr c.cfg.state c.cfg.head).toList⟩
 
-/-- One step relative to oracle `O`. -/
 def ostep (O : List Bool → Bool) (c : OCfg Q Γ) : OCfg Q Γ :=
   if M.toTM.halted c.cfg then c
   else if c.cfg.state = M.ask then M.answer c (O c.buf)
   else M.plain c
 
-/-- Run `n` steps relative to `O`. -/
 def orun (O : List Bool → Bool) : ℕ → OCfg Q Γ → OCfg Q Γ
   | 0, c => c
   | n + 1, c => orun O n (M.ostep O c)
 
-/-- Initial configuration on input `x`. -/
 def oinit (x : List Bool) : OCfg Q Γ := ⟨M.toTM.init x, []⟩
 
-/-- Unfold `t` steps of the machine into an oracle query tree whose leaf says "accepting". -/
 def unfold : ℕ → OCfg Q Γ → QTree
   | 0, c => .ret (decide (c.cfg.state = M.accept))
   | t + 1, c =>
@@ -85,7 +65,6 @@ theorem orun_of_halted (O : List Bool → Bool) {c : OCfg Q Γ} (h : M.toTM.halt
   | 0 => rfl
   | n + 1 => by simp only [orun, ostep, h, if_true]; exact orun_of_halted O h n
 
-/-- The tree computes exactly what the machine computes. -/
 theorem unfold_eval (O : List Bool → Bool) (t : ℕ) (c : OCfg Q Γ) :
     (M.unfold t c).eval O = decide ((M.orun O t c).cfg.state = M.accept) := by
   induction t generalizing c with
@@ -97,7 +76,6 @@ theorem unfold_eval (O : List Bool → Bool) (t : ℕ) (c : OCfg Q Γ) :
       · simp only [unfold, h, ha, if_false, if_true, QTree.eval, orun, ostep, ih]
       · simp only [unfold, h, ha, if_false, orun, ostep, ih]
 
-/-- At most `t` queries in `t` steps. -/
 theorem unfold_depth (t : ℕ) (c : OCfg Q Γ) : (M.unfold t c).depth ≤ t := by
   induction t generalizing c with
   | zero => simp [unfold, QTree.depth]
@@ -108,7 +86,6 @@ theorem unfold_depth (t : ℕ) (c : OCfg Q Γ) : (M.unfold t c).depth ≤ t := b
     · simp only [QTree.depth]; have := ih (M.answer c false); have := ih (M.answer c true); omega
     · have := ih (M.plain c); omega
 
-/-- Queried strings have length at most (initial buffer length) + `t`. -/
 theorem unfold_maxLen (t : ℕ) (c : OCfg Q Γ) : (M.unfold t c).maxLen ≤ c.buf.length + t := by
   induction t generalizing c with
   | zero => simp [unfold, QTree.maxLen]
@@ -129,45 +106,39 @@ theorem unfold_maxLen (t : ℕ) (c : OCfg Q Γ) : (M.unfold t c).maxLen ≤ c.bu
 
 end OTM
 
-/-- `M` decides `L` relative to oracle `A` within time `T`. -/
 def ODecidesInTime {Q Γ : Type} [DecidableEq Q] (M : OTM Q Γ) (A : List Bool → Bool)
     (L : Language) (T : ℕ → ℕ) : Prop :=
   ∀ x : List Bool, M.toTM.halted (M.orun A (T x.length) (M.oinit x)).cfg ∧
     ((M.orun A (T x.length) (M.oinit x)).cfg.state = M.accept ↔ x ∈ L)
 
-/-- `P^A`: languages decided in polynomial time by an oracle machine with oracle `A`. -/
+/-- `P^A`. -/
 def OracleP (A : List Bool → Bool) : Set Language :=
   {L | ∃ (k m : ℕ) (M : OTM (Fin k) (Fin m)) (p : ℕ[X]), ODecidesInTime M A L (fun n => p.eval n)}
 
-/-- The BGS test language `L_B = {x | ∃ y ∈ B, |y| = |x|}`. -/
+/-- BGS test language `L_B = {x | ∃ y ∈ B, |y| = |x|}`. -/
 def testLang (B : List Bool → Bool) : Language :=
   {x | ∃ y : List Bool, y.length = x.length ∧ B y = true}
 
-/-- Classical BGS raw slice: `∃ y, |y| = q(|x|) ∧ A y` (the test language form). -/
+/-- Classical raw slice (test-language fragment only; not the project `OracleNP`). -/
 def OracleNPRawSlice (A : List Bool → Bool) : Set Language :=
   {L | ∃ q : ℕ[X], ∀ x, x ∈ L ↔ ∃ y : List Bool, y.length = q.eval x.length ∧ A y = true}
 
-/-- X-oblivious existential slice over a language in `OracleP A` (stronger than raw slice). -/
+/-- Verifier slice: certificates checked by some `W ∈ OracleP A` (x-oblivious). -/
 def OracleNPSlice (A : List Bool → Bool) : Set Language :=
   {L | ∃ W ∈ OracleP A, ∃ q : ℕ[X],
     ∀ x, x ∈ L ↔ ∃ y : List Bool, y.length = q.eval x.length ∧ y ∈ W}
 
-/-- Full pair-based verifier form of `NP^A`. -/
+/-- Full pair-verifier form of `NP^A` (documentation / future strengthening). -/
 def OracleNPPair (A : List Bool → Bool) : Set Language :=
   {L | ∃ W ∈ OracleP A, ∃ q : ℕ[X],
     ∀ x, x ∈ L ↔ ∃ y : List Bool, y.length = q.eval x.length ∧ pair x y ∈ W}
 
-/-- **`NP^A` via the classical BGS raw slice.**
+/-- **`NP^A` via poly-time oracle verifiers (slice form).**
 
-`OracleNP A = OracleP A ∪ OracleNPRawSlice A`. This is exactly the fragment used in the
-Baker–Gill–Solovay separation (`testLang A = {x | ∃ y, |y|=|x| ∧ A y}`), and it admits a
-trivial collapse oracle (`A = fun _ => true`). The stronger verifier forms `OracleNPSlice`
-and `OracleNPPair` are retained for documentation / future work; `queryLang A ∈ OracleP A`
-embeds the raw slice into `OracleNPSlice`.
+`OracleNP A = OracleP A ∪ OracleNPSlice A`. Membership of a certificate string in a
+language `W ∈ OracleP A` is the verifier check. This is the project-wide definition.
 -/
 def OracleNP (A : List Bool → Bool) : Set Language :=
-  OracleP A ∪ OracleNPRawSlice A
-
--- Baker–Gill–Solovay collapse: see `PvsNP.Collapse.bgs_collapse`.
+  OracleP A ∪ OracleNPSlice A
 
 end PvsNP

@@ -4,10 +4,10 @@ import PvsNP.Enumeration
 import PvsNP.OracleVerifiers
 
 /-!
-# Baker–Gill–Solovay separation
+# Baker–Gill–Solovay separation (verifier `OracleNP`)
 
-Under `OracleNP = OracleP ∪ OracleNPRawSlice`, the classical test language sits in
-`OracleNPRawSlice` and the existing diagonalization shows it lies outside `OracleP`.
+Under `OracleNP = OracleP ∪ OracleNPSlice`, the test language sits in `OracleNPSlice`
+via `queryLang ∈ OracleP`, and diagonalization shows it lies outside `OracleP`.
 -/
 
 namespace PvsNP
@@ -17,14 +17,13 @@ open Polynomial Function
 def unary (n : ℕ) : List Bool := List.replicate n true
 @[simp] theorem unary_length (n : ℕ) : (unary n).length = n := List.length_replicate
 
-/-- The BGS test language is the raw slice with `q = X`. -/
 theorem testLang_mem_OracleNPRawSlice (B : List Bool → Bool) :
     testLang B ∈ OracleNPRawSlice B := by
   refine ⟨X, ?_⟩
   intro x
   simp [testLang, eval_X]
 
-/-- Still in the stronger slice form via `queryLang ∈ OracleP`. -/
+/-- Test language is in the verifier slice via `queryLang ∈ OracleP`. -/
 theorem testLang_mem_OracleNPSlice (B : List Bool → Bool) :
     testLang B ∈ OracleNPSlice B := by
   refine ⟨queryLang B, queryLang_mem_OracleP B, X, ?_⟩
@@ -33,7 +32,7 @@ theorem testLang_mem_OracleNPSlice (B : List Bool → Bool) :
 
 theorem testLang_mem_OracleNP (B : List Bool → Bool) :
     testLang B ∈ OracleNP B :=
-  Or.inr (testLang_mem_OracleNPRawSlice B)
+  Or.inr (testLang_mem_OracleNPSlice B)
 
 theorem unfold_decides_testLang {k m : ℕ} {M : OTM (Fin k) (Fin m)}
     {B : List Bool → Bool} {p : ℕ[X]}
@@ -72,14 +71,13 @@ theorem testLang_not_mem_OracleP_bgs : testLang bgsOracle ∉ OracleP bgsOracle 
   · exact (hn.1 (hiff.2 h)) h
   · exact (fun ht => h (hiff.1 ht)) (hn.2 h)
 
-/-- **Baker–Gill–Solovay (1975), separation.** -/
+/-- **Baker–Gill–Solovay (1975), separation** under verifier `OracleNP`. -/
 theorem bgs_separation : ∃ B, OracleP B ≠ OracleNP B := by
   refine ⟨bgsOracle, fun hEq => ?_⟩
   have hin : testLang bgsOracle ∈ OracleNP bgsOracle := testLang_mem_OracleNP _
   rw [← hEq] at hin
   exact testLang_not_mem_OracleP_bgs hin
 
-/-- Relativized `P ⊆ NP`: `OracleP A ⊆ OracleNP A` by construction of the union. -/
 theorem OracleP_subset_OracleNP (A : List Bool → Bool) : OracleP A ⊆ OracleNP A :=
   fun _ h => Or.inl h
 
