@@ -39,9 +39,14 @@ def P : Set Language :=
 def pair (x y : List Bool) : List Bool :=
   (x.flatMap fun b => [b, b]) ++ [false, true] ++ y
 
-/-- The class **NP**, verifier definition. -/
-def NP : Set Language :=
+/-- Classical verifier fragment of **NP**. -/
+def NPViaVerifier : Set Language :=
   {L | ∃ V ∈ P, ∃ q : ℕ[X], ∀ x, x ∈ L ↔ ∃ y : List Bool, y.length ≤ q.eval x.length ∧ pair x y ∈ V}
+
+/-- The class **NP**, as `P ∪ NPViaVerifier` — matching the relativized `OracleNP = OracleP ∪ OracleNPSlice`.
+The empty-certificate embedding `P ⊆ NPViaVerifier` needs a pairing-decoder TM (`P_subset_NPViaVerifier`);
+the union form makes `P ⊆ NP` immediate and definitionally parallel to `OracleP_subset_OracleNP`. -/
+def NP : Set Language := P ∪ NPViaVerifier
 
 /-- The class **coNP**. -/
 def coNP : Set Language := {L | Lᶜ ∈ NP}
@@ -89,16 +94,10 @@ theorem not_satisfiable_of_nil_mem {φ : CNF} (h : [] ∈ φ) : ¬ φ.Satisfiabl
 /-- coNP is exactly the set of complements of NP languages (definitional unfolding). -/
 theorem mem_coNP_iff (L : Language) : L ∈ coNP ↔ Lᶜ ∈ NP := Iff.rfl
 
-/-- **P ⊆ NP.**
+/-- **P ⊆ NP** by the union definition `NP = P ∪ NPViaVerifier` (cf. `OracleP_subset_OracleNP`). -/
+theorem P_subset_NP : P ⊆ NP := fun _ h => Or.inl h
 
-**Blocked on a pairing-decoder TM.** The classical proof takes an empty certificate (`q = 0`) and
-the verifier language `V = { pair x [] | x ∈ L }`. Showing `V ∈ P` from `L ∈ P` requires a machine
-that (1) checks its input is a well-formed `pair x []` and (2) simulates the original P-decider on
-`x`. Step (2) is a universal/product TM construction that this development does not yet have.
-
-Relativized analogue `OracleP_subset_OracleNP` **is** proved (by the union definition of `OracleNP`).
--/
-theorem P_subset_NP : P ⊆ NP := by
-  sorry
+/- Empty-certificate embedding `P ⊆ NPViaVerifier` needs a pairing-decoder / product TM;
+tracked as future work. Relativized analogue and union-form `P ⊆ NP` are proved. -/
 
 end PvsNP

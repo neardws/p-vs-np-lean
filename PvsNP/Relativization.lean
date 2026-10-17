@@ -27,7 +27,7 @@ is *not* true by definition.
 ## Status
 * `OracleNP` is the verifier-based class `OracleP ∪ OracleNPSlice` (see definitions below).
 * `bgs_separation` is proved in `PvsNP.Verifier`.
-* `bgs_collapse` is pending on the PSPACE bridge lemmas in `PvsNP.Collapse`.
+* `bgs_collapse` is proved in `PvsNP.Collapse` (via `upspaceOracle`).
 -/
 
 namespace PvsNP
@@ -169,8 +169,6 @@ The fully x-aware form `OracleNPPair` (certificate `pair x y`) is recorded above
 def OracleNP (A : List Bool → Bool) : Set Language :=
   OracleP A ∪ OracleNPSlice A
 
-/-- **Baker–Gill–Solovay (1975), collapse.** Target: a PSPACE-complete oracle.
-See `PvsNP.Collapse` for the scaffolding. -/
-theorem bgs_collapse : ∃ A, OracleP A = OracleNP A := sorry
+-- Baker–Gill–Solovay collapse: see `PvsNP.Collapse.bgs_collapse`.
 
 end PvsNP

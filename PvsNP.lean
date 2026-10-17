@@ -8,5 +8,7 @@ import PvsNP.Enumeration
 import PvsNP.Pairing
 import PvsNP.OracleVerifiers
 import PvsNP.Verifier
+import PvsNP.SpaceSim
+import PvsNP.TagDecide
 import PvsNP.Collapse
 import PvsNP.NaturalProofs

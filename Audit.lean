@@ -19,10 +19,14 @@ open PvsNP PvsNP.Natural
 #print axioms testLang_not_mem_OracleP_bgs
 #print axioms bgs_separation
 #print axioms OracleP_subset_OracleNP
+#print axioms P_subset_NP
 #print axioms OracleNPSlice.lengthSymmetric
 #print axioms not_lengthSymmetric_singleton_false
 #print axioms queryOTM_decides
-#print axioms P_ne_NP
-#print axioms bgs_collapse
-#print axioms P_subset_NP
 #print axioms bgs_collapse_of_bridges
+#print axioms PSPACE_subset_OracleP_tqbf
+#print axioms bgs_collapse
+#print axioms P_ne_NP
+#print axioms tagEncode_injective
+#print axioms spaceLang_iff_oracle
+#print axioms const_false_has_circuit
